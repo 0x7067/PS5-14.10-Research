@@ -1,0 +1,43 @@
+=== 14.10 RECON: IPV6 + SCM_RIGHTS ===
+fw: 14.10
+pid: 336
+
+--- PART 1: IPv6 raw socket options ---
+  raw6 socket: fd=22
+  IPV6_UNICAST_HOPS      get:rv=-1 len=256 val=0 set:rv=-1
+  IPV6_MULTICAST_IF      get:rv=-1 len=256 val=0 set:rv=-1
+  IPV6_V6ONLY            get:rv=-1 len=256 val=0 set:rv=-1
+  IPV6_RECVTCLASS        get:rv=-1 len=256 val=0 set:rv=-1
+  IPV6_RECVPKTINFO       get:rv=0 len=0 val=0 set:rv=-1
+  IPV6_RECVHOPLIMIT      get:rv=0 len=4 val=4294967295 set:rv=-1
+  IPV6_RECVRTHDR         get:rv=0 len=4 val=1 set:rv=0
+  IPV6_RECVHOPOPTS       get:rv=-1 len=256 val=0 set:rv=-1
+  IPV6_RECVDSTOPTS       get:rv=-1 len=256 val=0 set:rv=0
+  IPV6_RTHDR             get:rv=0 len=4 val=0 set:rv=0
+  IPV6_HOPOPTS           get:rv=0 len=4 val=0 set:rv=-1
+  IPV6_DSTOPTS           get:rv=0 len=4 val=0 set:rv=-1
+  IPV6_RTHDRDSTOPTS      get:rv=0 len=4 val=0 set:rv=-1
+  IPV6_PKTINFO           get:rv=0 len=0 val=0 set:rv=-1
+  IPV6_HOPLIMIT          get:rv=0 len=0 val=0 set:rv=-1
+  IPV6_NEXTHOP           get:rv=-1 len=256 val=0 set:rv=-1
+  IPV6_TCLASS            get:rv=-1 len=256 val=0 set:rv=-1
+  IPV6_ORIGDSTADDR       get:rv=0 len=4 val=0 set:rv=0
+
+--- PART 2: IPv6 HBH ancillary data ---
+  sendmsg with HBH: rv=-1
+  sendmsg malformed HBH: rv=-1
+  sendmsg change-flag HBH: rv=-1
+
+--- PART 3: SCM_RIGHTS stress ---
+  control pair: 22,23
+  created 20 fds to pass
+  sendmsg 16 fds: rv=4
+  recvmsg: 16 fds received: 44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59
+
+--- PART 4: SCM_RIGHTS closed fd ---
+  sendmsg closed fd 24: rv=-1
+  sendmsg fd=-1: rv=-1
+  sendmsg fd=9999: rv=-1
+
+=== IPV6+SCM DONE ===
+pid final: 336

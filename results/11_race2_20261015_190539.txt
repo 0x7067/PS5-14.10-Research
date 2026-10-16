@@ -1,0 +1,22 @@
+--- racer_a ---
+=== RACER A: creator ===
+pid: 196
+mmap: 0x400000000
+create_ok: 1000
+destroy_ok: 1000
+pid after: 196
+=== RACER A DONE ===
+
+status: done
+
+--- racer_b ---
+=== RACER B: destroyer ===
+pid: 196
+mmap: 0x400000000
+destroy_ok: 5000
+destroy_fail: 0
+pid after: 196
+=== RACER B DONE ===
+
+status: done
+

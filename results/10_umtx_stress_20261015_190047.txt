@@ -1,0 +1,56 @@
+=== 14.10 RECON: UMTX_OP STRESS ===
+fw: 14.10
+pid: 196
+tid: 0
+
+--- STRESS 1: UMTX_OP_SHM alloc/free churn ---
+  100 rounds: create=100 lookup=100 alive=100 destroy=100 create_fail=0
+
+  rapid create without destroy...
+  created 200/200 SHM keys without destroy
+
+  double-destroy test...
+  destroy 1: OK
+  destroy 2: OK
+  lookup after dd: OK(!)
+
+--- STRESS 2: UMTX_OP_ROBUST_LISTS ---
+  register robust list: OK
+  oversized robust: ACCEPTED(!)
+  zero-size robust: ACCEPTED
+  double-register: OK (re-register works)
+
+--- STRESS 3: WAIT/WAKE churn ---
+  500 wait/wake: ok=500 timeout=0 err=0
+
+--- STRESS 4: mutex state machine ---
+  trylock: OK owner=0
+  unlock: OK owner=0
+  double unlock: OK(!)
+  wake owned mutex: OK
+  wake2 unowned: OK
+  200 lock/unlock rounds: 200 ok
+
+--- STRESS 5: SEM2 churn ---
+  100 SEM2_WAKE: 100 ok
+
+--- STRESS 6: NWAKE_PRIVATE ---
+  nwake 4 addrs: OK
+  nwake 1000 count: OK(!)
+  nwake 0 count: OK
+  nwake INT_MAX: OK(!)
+
+--- STRESS 7: CV signal/broadcast ---
+  100 rounds: signal=100 broadcast=100
+
+=== UMTX STRESS DONE ===
+
+=== ANALYSIS ===
+FINDING 1: NWAKE_PRIVATE INT_MAX - accepts count=0x7FFFFFFF without error
+  -> kernel reads count*8 bytes from userspace, potential integer overflow
+FINDING 2: SHM double-destroy + lookup after = OK
+  -> exact CVE-2024-43102 pattern, needs threading to trigger UAF
+FINDING 3: ROBUST_LISTS oversized struct accepted (4096 vs expected 24)
+  -> potential copyin overflow / info leak
+FINDING 4: mutex double-unlock succeeds on unowned mutex
+  -> logic bug, exploitable under contention

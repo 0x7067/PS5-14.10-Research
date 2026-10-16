@@ -1,0 +1,53 @@
+[*] Connecting to 10.0.0.96:9026...
+[*] Connected, sending 11290 bytes...
+[*] Waiting for response...
+=== 14.10 RECON: FCNTL BYPASS ===
+fw: 14.10
+pid: 350
+
+--- PART 1: F_SETFL bypass detail ---
+  baseline F_GETFL: rv=2
+  F_SETFL(NONBLK): rv=-1
+  verify F_GETFL: rv=6
+  F_SETFL(APPEND): rv=-1
+  verify F_GETFL: rv=10
+  F_SETFL(ASYNC): rv=-1
+  verify F_GETFL: rv=66
+  flags breakdown: O_ASYNC=SET O_NONBLK=no O_APPEND=no
+
+--- PART 2: F_SETOWN bypass ---
+  F_SETOWN(self): rv=-1
+  F_GETOWN verify: rv=-1
+  (expected: 350 if bypass worked, 0/-1 if blocked)
+  F_SETOWN(-pid): rv=-1
+  F_GETOWN verify: rv=-1
+
+--- PART 3: F_SETFD bypass ---
+  F_SETFD(CLOEXEC): rv=-1
+  F_GETFD verify: rv=-1
+
+--- PART 4: SIGIO delivery test ---
+  F_SETFL(ASYNC) on sa: rv=-1
+  F_GETFL verify: 66
+  O_ASYNC active: true
+  F_SETOWN(self): rv=-1
+  sigaction(SIGIO, SIG_IGN): rv=0
+  sigaction(SIGURG, SIG_IGN): rv=0
+  write to peer: rv=8
+  survived after write (SIG_IGN caught or no signal)
+  F_SETFL(ASYNC|NONBLK): rv=-1
+  verify: 70
+
+--- PART 5: poll/select ---
+  poll(sa, POLLIN, 100ms): rv=1 revents=0x0001
+  read from sa: rv=8
+  poll(sa, empty): rv=0 revents=0x0000
+
+--- PART 6: kqueue ---
+  kqueue(): fd=24
+  kevent(add+poll): rv=-1
+
+=== FCNTL BYPASS DONE ===
+pid final: 350
+
+[*] Received 1151 bytes total

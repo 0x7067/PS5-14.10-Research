@@ -1,0 +1,21 @@
+=== 14.10 RECON: KERNEL ATTACK SURFACE ===
+fw: 14.10
+
+--- TEST 1: umtx_op ---
+  LOCK (0): OK
+  UNLOCK (1): OK
+  WAKE (3): OK
+  CV_SIGNAL (9): OK
+  CV_BROADCAST (10): OK
+  WAIT_UINT_PRIVATE (15): OK
+  WAKE_PRIVATE (16): OK
+  MUTEX_WAIT (17): OK
+  MUTEX_WAKE (18): OK
+  SEM_WAKE (20): OK
+  NWAKE_PRIVATE (21): OK
+  MUTEX_WAKE2 (22): OK
+  SEM2_WAKE (24): OK
+  SHM (25): OK
+  ROBUST_LISTS (26): OK
+
+--- TEST 2: kqueue family ---

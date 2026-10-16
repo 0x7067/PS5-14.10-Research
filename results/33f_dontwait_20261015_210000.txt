@@ -1,0 +1,30 @@
+[*] Connecting to 10.0.0.96:9026...
+[*] Connected, sending 3465 bytes...
+[*] Waiting for response...
+=== 33f: DONTWAIT SAFE ===
+fw: 14.10
+pid: 360
+
+--- PART 1: basic ---
+pair: 22,23
+recv(empty): rv=-1
+send(8): rv=8
+recv: rv=8
+recv(empty2): rv=-1
+
+--- PART 2: SNDBUF=1 ---
+SNDBUF=1
+send1(1): rv=1
+send2(1,full): rv=-1
+drain: rv=1
+send3(4): rv=1
+drain2: rv=1
+rapid 100x: 100 ok
+
+--- PART 3: both=1 ---
+RCVBUF=1 on sb
+50x both=1: 50 ok
+
+=== DONTWAIT SAFE DONE ===
+
+[*] Received 360 bytes total

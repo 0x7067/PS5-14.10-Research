@@ -1,0 +1,89 @@
+=== 14.10 RECON: NWAKE + ROBUST DEEP DIVE ===
+fw: 14.10
+pid: 196
+
+--- PART 1: NWAKE_PRIVATE integer overflow ---
+  testing count values...
+  count=0x00000000 (         0): -1
+  count=0x00000001 (         1): -1
+  count=0x00000002 (         2): -1
+  count=0x00000004 (         4): -1
+  count=0x00000008 (         8): -1
+  count=0x00000010 (        16): -1
+  count=0x00000040 (        64): -1
+  count=0x00000100 (       256): -1
+  count=0x00000400 (      1024): -1
+  count=0x00001000 (      4096): -1
+  count=0x00004000 (     16384): -1
+  count=0x00010000 (     65536): -1
+  count=0x00040000 (    262144): -1
+  count=0x00100000 (   1048576): -1
+  count=0x10000000 ( 268435456): -1
+  count=0x20000000 ( 536870912): -1
+  count=0x40000000 (1073741824): -1
+  count=0x7fffffff (2147483647): -1
+
+  testing with array at unmapped region...
+  unmapped array, count=1: -1
+  unmapped array, count=MAX: -1
+
+  testing overflow boundary...
+  count=0x20000000 (32-bit overflow to 0): -1
+  count=0x20000001 (overflows to 8): -1
+
+  timing test (count=256 vs count=0x40000000)...
+  count=256: 0.0000 sec
+  count=0x01000000 (16M): 0.0000 sec
+
+--- PART 2: ROBUST_LISTS oversized struct ---
+  testing size values...
+  size=    0: OK (ret=-1)
+  size=    1: OK (ret=-1)
+  size=    8: OK (ret=-1)
+  size=   16: OK (ret=-1)
+  size=   23: OK (ret=-1)
+  size=   24: OK (ret=-1)
+  size=   25: OK (ret=-1)
+  size=   32: OK (ret=-1)
+  size=   48: OK (ret=-1)
+  size=   64: OK (ret=-1)
+  size=  128: OK (ret=-1)
+  size=  256: OK (ret=-1)
+  size=  512: OK (ret=-1)
+  size= 1024: OK (ret=-1)
+  size= 2048: OK (ret=-1)
+  size= 4096: OK (ret=-1)
+  size= 8192: OK (ret=-1)
+  size=16384: OK (ret=-1)
+  size=32768: OK (ret=-1)
+  size=65536: OK (ret=-1)
+
+  checking for kernel data leakback...
+  no modifications beyond struct (copyin only, no copyout)
+
+  first 24 bytes after register:
+    +0: 0x0000000000001000
+    +8: 0x0000000310715ee0
+    +16: 0x0000000000000000
+
+--- PART 3: ROBUST_LISTS stack overflow test ---
+  size=  256: OK (alive=true)
+  size=  512: OK (alive=true)
+  size= 1024: OK (alive=true)
+  size= 2048: OK (alive=true)
+  size= 4096: OK (alive=true)
+  size= 8192: OK (alive=true)
+  size=16384: OK (alive=true)
+  size=32768: OK (alive=true)
+  size=65536: OK (alive=true)
+
+--- PART 4: NWAKE crafted pointer array ---
+  NULL pointer in array: OK
+  addr=4 in array: OK
+  addr=0x7FFFFFFFFFFF: OK
+  addr=kernel text: OK(!)
+  mixed valid+kernel array: OK
+  *** kernel processes array past bad addresses! ***
+
+=== NWAKE + ROBUST DEEP DIVE DONE ===
+pid final: 196

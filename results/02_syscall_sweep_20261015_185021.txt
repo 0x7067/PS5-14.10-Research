@@ -1,0 +1,71 @@
+=== 14.10 RECON: SYSCALL SWEEP ===
+fw: 14.10
+resolve: OK
+
+--- AVAILABLE (59) ---
+  sc_aio_read
+  sc_aio_write
+  sc_lio_listio
+  sc_aio_return
+  sc_aio_suspend
+  sc_aio_cancel
+  sc_aio_error
+  sc_aio_waitcomplete
+  sc_aio_fsync
+  sc_aio_mlock
+  sc_aio_readv
+  sc_aio_writev
+  sc_aio_multi_cancel
+  sc_aio_multi_wait
+  sc_umtx_op
+  sc_kqueueex
+  sc_kqueuex
+  sc_setsockopt
+  sc_getsockopt
+  sc_socketpair
+  sc_sendto
+  sc_recvfrom
+  sc_sendmsg
+  sc_recvmsg
+  sc_ioctl
+  sc_dup2
+  sc_fcntl
+  sc_readv
+  sc_writev
+  sc_getdents
+  sc_pipe2
+  sc_mmap
+  sc_munmap
+  sc_mprotect
+  sc_madvise
+  sc_mincore
+  sc_mlock
+  sc_munlock
+  sc_thr_new
+  sc_thr_self
+  sc_thr_kill
+  sc_thr_kill2
+  sc_sysctl
+  sc_shm_open2
+  sc_shm_rename
+  sc_sigaction
+  sc_sigprocmask
+  sc_sysarch
+  sc_issetugid
+  sc_kldload
+  sc_kldunload
+  sc_kldfind
+  sc_kldnext
+  sc_kldstat
+  sc_kldfirstmod
+  sc_cap_rights_limit
+  sc_cap_ioctls_limit
+  sc_pdfork
+  sc_pdkill
+
+--- MISSING (0) ---
+
+--- SAFE CALL TESTS ---
+  getpid: 168
+  issetugid: 0
+  thr_self: tid=0

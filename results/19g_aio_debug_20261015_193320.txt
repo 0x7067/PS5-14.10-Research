@@ -1,0 +1,8 @@
+=== 14.10 RECON: AIO DEBUG ===
+fw: 14.10
+pid: 259
+
+--- PART 1: aio_error baseline ---
+  aio_error: rv=-1
+
+--- PART 2: alternate aio_read numbers ---

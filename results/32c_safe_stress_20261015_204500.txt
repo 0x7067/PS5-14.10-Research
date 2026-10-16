@@ -1,0 +1,52 @@
+[*] Connecting to 10.0.0.96:9026...
+[*] Connected, sending 7782 bytes...
+[*] Waiting for response...
+=== 14.10 RECON: SAFE STRESS ===
+fw: 14.10
+pid: 355
+
+--- PART 1: SO_SETFIB ---
+  default: rv=0 val=0
+  set(0): srv=-1 get=0
+  set(1): srv=-1 get=0
+  set(2): srv=-1 get=0
+  set(15): srv=-1 get=0
+  set(16): srv=-1 get=0
+  set(31): srv=-1 get=0
+  set(32): srv=-1 get=0
+  set(255): srv=-1 get=0
+  set(256): srv=-1 get=0
+  set(65535): srv=-1 get=0
+  set(2147483647): srv=-1 get=0
+
+--- PART 2: SO_USER_COOKIE ---
+  default: rv=0 val=0
+  set(0x0): srv=-1 get=0x00000000
+  set(0x1): srv=-1 get=0x00000000
+  set(0x2a): srv=-1 get=0x00000000
+  set(0xdeadbeef): srv=-1 get=0x00000000
+  set(0x7fffffff): srv=-1 get=0x00000000
+  set(0x80000000): srv=-1 get=0x00000000
+  set(0xffffffff): srv=-1 get=0x00000000
+
+--- PART 3: poll edges ---
+  poll(nfds=0): rv=0
+  poll(fd=9999): rv=1 rev=0x0020
+  poll(fd=-1): rv=0 rev=0x0000
+  poll(closed peer): rv=1 rev=0x0051
+  read(closed peer): rv=0
+  poll(3 mixed): rv=2 rev=[0x0001,0x0020,0x0000]
+
+--- PART 4: SO_TIMESTAMP ---
+  set SO_TIMESTAMP=1: rv=0
+  TS_CLOCK=0: srv=-1 get=0
+  TS_CLOCK=1: srv=-1 get=0
+  TS_CLOCK=2: srv=-1 get=0
+  TS_CLOCK=3: srv=-1 get=0
+  recvmsg: rv=8
+  cmsg: len=0 level=0x0 type=0
+
+=== SAFE STRESS DONE ===
+pid final: 355
+
+[*] Received 1174 bytes total

@@ -1,0 +1,19 @@
+=== 14.10 RECON: W^X GADGET ===
+fw: 14.10
+pid: 308
+
+--- PART 1: RW mmap + mprotect RX ---
+  RW mmap: 0x310a10000
+  mprotect(RX): rv=-1
+  mprotect(X only): rv=-1
+  mprotect(RWX): rv=-1
+
+--- PART 2: mmap RX directly ---
+  RX mmap: 0x310a14000
+  byte[0]: 0x00
+
+--- PART 3: probe crash handler offsets ---
+  no gadget available, skipping handler test
+
+=== W^X GADGET DONE ===
+pid final: 308

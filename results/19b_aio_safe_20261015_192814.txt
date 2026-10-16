@@ -1,0 +1,23 @@
+=== 14.10 RECON: AIO SAFE ===
+fw: 14.10
+pid: 224
+
+--- PART 1: AIO syscall resolution ---
+  255 aio_read                  OK
+  256 aio_write                 OK
+  314 aio_return                OK
+  315 aio_error                 OK
+  316 aio_cancel                OK
+  317 aio_error_alt             OK
+  321 aio_waitcomplete          OK
+  341 aio_suspend               OK
+  359 aio_waitcomplete2         OK
+  587 aio_multi_wait            OK
+  588 aio_multi_cancel          OK
+  589 aio_multi_delete          OK
+  590 aio_multi_poll            OK
+
+--- PART 2: pipe + aiocb layout test ---
+  pipe: rfd=0 wfd=0
+  write: -1
+  trying layout A (FreeBSD standard)...

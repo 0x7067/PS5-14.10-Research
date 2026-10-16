@@ -1,0 +1,22 @@
+=== 14.10 RECON: UMTX RACE ===
+fw: 14.10
+pid: 196
+sync region: 0x31075c000
+
+--- STRATEGY A: rfork race ---
+rfork returned: -1
+rfork error code: -1
+
+--- STRATEGY B: single-thread SHM stress ---
+  create-destroy-create-lookup: 200/200
+  destroy diff value same addr: 100/100
+  burst create/LIFO destroy: 500/500
+  interleave k1/k2 lookup: 0/300
+
+  robust+shm interaction...
+  register robust -> SHM: OK
+  destroyed SHM under robust list
+  still alive: pid=196
+
+=== UMTX RACE DONE ===
+pid final: 196

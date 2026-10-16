@@ -1,0 +1,5 @@
+=== 14.10 RECON: SYSCALL SWEEP ===
+fw: 14.10
+
+sweeping syscalls 0-600...
+

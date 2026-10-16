@@ -1,0 +1,17 @@
+=== 14.10 RECON: MMAP+FCNTL DEEP ===
+fw: 14.10
+pid: 343
+
+--- PART 1: madvise ---
+  MADV_NORMAL          rv=0
+  MADV_RANDOM          rv=0
+  MADV_SEQUENTIAL      rv=0
+  MADV_WILLNEED        rv=0
+  MADV_DONTNEED        rv=0
+  MADV_FREE            rv=0
+  MADV_NOSYNC          rv=0
+  MADV_AUTOSYNC        rv=0
+  MADV_NOCORE          rv=0
+  MADV_CORE            rv=0
+  MADV_PROTECT         rv=-1
+  mlock: rv=0

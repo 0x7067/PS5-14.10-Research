@@ -1,0 +1,64 @@
+[*] Connecting to 10.0.0.96:9026...
+[*] Connected, sending 11382 bytes...
+[*] Waiting for response...
+=== 14.10 RECON: FCNTL+SCM DEEP ===
+fw: 14.10
+pid: 350
+
+--- PART 1: writev/readv ---
+  pair: 22,23
+  writev 16x64: rv=1024
+  readv 16x64: rv=1024
+  writev 1024x1: rv=1024
+  writev 1025x1: rv=-1
+
+--- PART 2: fcntl ---
+  F_DUPFD              rv=-1
+  F_GETFD              rv=-1
+  F_SETFD(CLOEXEC)     rv=-1
+  F_GETFD(verify)      rv=-1
+  F_GETFL              rv=2
+  F_SETFL(NONBLK)      rv=-1
+  F_GETFL(verify)      rv=6
+  F_GETOWN             rv=-1
+  F_SETOWN(self)       rv=-1
+  F_GETOWN(verify)     rv=-1
+  F_READAHEAD          rv=-1
+  F_RDAHEAD(1)         rv=-1
+  F_GET_SEALS          rv=-1
+
+  ioctl:
+  FIONREAD: rv=-1 bytes=0
+  FIONBIO(1): rv=-1
+  shutdown(WR): rv=0
+
+--- PART 3: pipe2 ---
+  pipe2(0): rv=-1 fds=[57005,57005]
+  pipe2 didn't write to pointer (like pipe)
+  return value: -1 (may be read fd)
+  pipe2(NONBLK): rv=-1 fds=[57005,57005]
+
+--- PART 4: SCM_RIGHTS refcount ---
+  target: 24, peer: 25
+  sent target_fd 5 times
+  closed original target_fd
+  received fds: 24,26,27,28,29
+  working received fds: 5/5
+  peer read: 20 bytes
+
+--- PART 5: socket options ---
+  TCP socket: fd=22
+  SO_REUSEADDR     rv=0 val=0
+  SO_KEEPALIVE     rv=0 val=0
+  SO_SNDBUF        rv=0 val=32768
+  SO_RCVBUF        rv=0 val=65536
+  SO_LINGER        rv=0 val=0
+  SO_SNDLOWAT      rv=0 val=0
+  SO_RCVLOWAT      rv=0 val=1
+  set SNDBUF=MAX: rv=-1
+  SNDBUF now: 32768
+
+=== FCNTL+SCM DEEP DONE ===
+pid final: 350
+
+[*] Received 1401 bytes total

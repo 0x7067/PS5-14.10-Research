@@ -1,0 +1,25 @@
+=== 14.10 RECON: SIGALT IGN ONLY ===
+fw: 14.10
+pid: 280
+
+--- PART 1: SIG_IGN + user altstack ---
+  set user altstack: true
+  set SIGUSR1 = IGN + ONSTACK
+  verify: handler=0x0000000000000001 flags=0x1
+  kill(SIGUSR1): rv=0
+  user altstack modified dwords: 0
+  alive: true
+
+--- PART 2: SIG_IGN + kernel DMAP altstack ---
+  set kernel altstack: true
+  verify: sp=0xfffff80010000000 flags=0x0
+  kill(SIGUSR1) with kernel altstack: rv=0
+  alive: true
+
+--- PART 3: SIG_IGN + kernel TEXT altstack ---
+  set kernel text altstack: true
+  kill(SIGUSR1) with ktext altstack: rv=0
+  alive: true
+
+--- PART 4: SIG_DFL + kernel altstack (SIGUSR2) ---
+  WARNING: this may kill the process

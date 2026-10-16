@@ -1,0 +1,37 @@
+=== 14.10 RECON: THREAD + FD SURFACE ===
+fw: 14.10
+pid: 329
+
+--- PART 1: threading syscalls ---
+  thr_self: rv=0 tid=0
+  fork: rv=-1 (parent, child=-1)
+  rfork(PROC|MEM|NOWAIT): rv=-1
+  thr_new: rv=-1
+
+--- PART 2: SCM_RIGHTS ---
+  pair1: 22,23  pair2: 24,25
+  sendmsg(SCM_RIGHTS): rv=1
+  recvmsg: rv=1 cmsg_len=20 level=0xffff type=1 fd=26
+  write to passed fd: rv=8
+  read from pair: rv=8 data=0xdeadbeefcafe1000
+
+--- PART 3: fd operations ---
+  dup(22): fd=-1
+  dup2(22,100): rv=-1
+  fcntl(GETFL): flags=2
+  fcntl(GETFD): flags=-1
+  fstat: rv=-1 dev=0 ino=0 mode=0x0
+
+--- PART 4: socket types ---
+  AF_UNIX STREAM       fd=26
+  AF_UNIX DGRAM        fd=26
+  AF_INET STREAM       fd=26
+  AF_INET DGRAM        fd=26
+  AF_INET RAW          fd=26
+  AF_INET6 STREAM      fd=26
+  AF_INET6 DGRAM       fd=26
+  AF_INET6 RAW         fd=26
+  AF_LINK STREAM       rv=-1
+  AF_NETGRAPH DGRAM    rv=-1
+
+--- PART 5: shm + special files ---

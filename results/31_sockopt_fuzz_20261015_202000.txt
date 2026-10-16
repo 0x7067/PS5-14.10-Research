@@ -1,0 +1,124 @@
+[*] Connecting to 10.0.0.96:9026...
+[*] Connected, sending 12864 bytes...
+[*] Waiting for response...
+=== 14.10 RECON: SOCKOPT FUZZ ===
+fw: 14.10
+pid: 350
+
+--- PART 1: TCP opts (level=6) ---
+  TCP fd=22
+  get TCP_NODELAY          rv=0 len=4 val=0x00000000,deaddead
+  get TCP_MAXSEG           rv=0 len=4 val=0x00000218,deaddead
+  get TCP_NOPUSH           rv=0 len=4 val=0x00000000,deaddead
+  get TCP_NOOPT            rv=0 len=4 val=0x00000000,deaddead
+  get TCP_MD5SIG           rv=-1
+  get TCP_INFO             rv=0 len=128 val=0x00000000,00000200
+  get TCP_CONGESTION       rv=0 len=8 val=0x7277656e,006f6e65
+  get TCP_KEEPINIT         rv=0 len=4 val=0x00000000,deaddead
+  get TCP_KEEPIDLE         rv=-1
+  get TCP_KEEPINTVL        rv=-1
+  get TCP_KEEPCNT          rv=-1
+  get TCP_FASTOPEN         rv=-1
+  get TCP_FUNCTION_BLK     rv=-1
+  set TCP_NODELAY=1: rv=0
+  set TCP_MAXSEG=0: rv=-1
+  set TCP_MAXSEG=1: rv=-1
+  set TCP_MAXSEG=65535: rv=-1
+  set TCP_MAXSEG=MAX: rv=-1
+  get TCP_MAXSEG: val=536
+  set KEEPINIT=MAX: srv=0 get=65536
+  set KEEPIDLE=MAX: srv=-1 get=3735937024
+  set KEEPINTVL=MAX: srv=-1 get=3735937024
+  set KEEPCNT=MAX: srv=-1 get=3735937024
+  set NODELAY len=0: rv=-1
+  set NODELAY len=1: rv=-1
+  set NODELAY len=4096: rv=0
+  get NODELAY len=0: rv=0 actual_len=0
+  get NODELAY len=1: rv=0 actual_len=1 val=0xdeade004
+  get TCP_INFO(256): rv=0 len=236
+  get TCP_FUNCTION_BLK: rv=-1 len=64
+
+--- PART 2: IP opts (level=0) ---
+  UDP fd=22
+  get IP_OPTIONS           rv=0 len=0 val=3735937024
+  get IP_HDRINCL           rv=-1
+  get IP_TOS               rv=0 len=4 val=0
+  get IP_TTL               rv=0 len=4 val=64
+  get IP_RECVOPTS          rv=0 len=4 val=0
+  get IP_RECVRETOPTS       rv=0 len=4 val=0
+  get IP_RECVDSTADDR       rv=0 len=4 val=0
+  get IP_MULTICAST_IF      rv=0 len=4 val=0
+  get IP_MULTICAST_TTL     rv=0 len=4 val=1
+  get IP_MULTICAST_LOOP    rv=0 len=4 val=1
+  get IP_RECVTTL           rv=-1
+  get IP_MINTTL            rv=-1
+  get IP_DONTFRAG          rv=0 len=4 val=0
+  get IP_RECVTOS           rv=0 len=4 val=0
+  get IP_FLOWID            rv=-1
+  get IP_FLOWTYPE          rv=-1
+  get IP_ORIGDSTADDR       rv=-1
+  set IP_TTL=0: rv=0
+  set IP_TTL=255: rv=0
+  set IP_TTL=256: rv=0
+  set IP_TTL=-1: rv=0
+  get IP_TTL: val=255
+  set IP_MINTTL=255: rv=0
+  RAW socket: fd=23
+  set IP_HDRINCL=1: rv=0
+  get IP_HDRINCL: rv=0 val=8
+  set IP_OPTIONS(40): rv=-1
+  set IP_OPTIONS(44): rv=-1
+
+--- PART 3: IPv6 opts (level=41) ---
+  UDPv6 fd=22
+  get IPV6_UNICAST_HOPS      rv=-1
+  get IPV6_MULTICAST_HOPS    rv=-1
+  get IPV6_V6ONLY            rv=-1
+  get IPV6_RECVPKTINFO       rv=-1
+  get IPV6_CHECKSUM          rv=0 len=4 val=0
+  get IPV6_FAITH             rv=-1
+  get IPV6_RECVTCLASS        rv=0 len=4 val=1
+  get IPV6_AUTOFLOWLABEL     rv=-1
+  get IPV6_RECVRTHDR         rv=0 len=4 val=0
+  get IPV6_RECVDSTOPTS       rv=0 len=4 val=0
+  get IPV6_USE_MIN_MTU       rv=0 len=4 val=4294967295
+  get IPV6_TCLASS            rv=0 len=0 val=3735937024
+  get IPV6_ORIGDSTADDR       rv=0 len=4 val=0
+  get IPV6_PKTINFO           rv=0 len=4 val=4294967295
+  get IPV6_FLOWID            rv=-1
+  get IPV6_FLOWTYPE          rv=-1
+  set UNICAST_HOPS=-1: rv=-1
+  set UNICAST_HOPS=256: rv=-1
+  set IPV6_PKTINFO(lo): rv=-1
+  set IPV6_TCLASS=255: rv=-1
+  set IPV6_TCLASS=256: rv=-1
+
+--- PART 4: SOL_SOCKET edge cases ---
+  set SNDBUF=0: rv=-1
+  set SNDBUF=1: rv=0
+  set SNDBUF=MAX: rv=-1
+  set SNDBUF=NEG: rv=-1
+  get SNDBUF: val=1
+  set RCVBUF=0: rv=-1
+  set RCVBUF=1: rv=0
+  set RCVBUF=MAX: rv=-1
+  set RCVBUF=NEG: rv=-1
+  get RCVBUF: val=1
+  set LINGER(on,0): rv=0
+  set LINGER(on,MAX): rv=-1
+  set LINGER(on,-1): rv=-1
+  set SNDLOWAT=0: rv=-1
+  set SNDLOWAT=MAX: rv=-1
+  set RCVLOWAT=1: rv=0
+  set RCVLOWAT=MAX: rv=0
+  get RCVLOWAT: val=1
+  set SNDTIMEO(0,0): rv=0
+  set RCVTIMEO(huge): rv=-1
+  set ACCEPTFILTER: rv=-1
+  get SOL 0x2000: rv=0 len=4 val=0x00000000
+  get SOL 0x10000: rv=0 len=4 val=0x00000000
+
+=== SOCKOPT FUZZ DONE ===
+pid final: 350
+
+[*] Received 3858 bytes total

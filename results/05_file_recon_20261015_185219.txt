@@ -1,0 +1,199 @@
+=== 14.10 RECON: FILE RECON ===
+fw: 14.10
+
+--- / (8 entries) ---
+  [dir] .
+  [dir] ..
+  [dir] system_tmp
+  [dir] DHanI5vJKq
+  [dir] dev
+  [dir] app0
+  [dir] savedata0
+  [dir] av_contents
+
+--- /dev (79 entries) ---
+  [dir] .
+  [dir] ..
+  [chr] random
+  [link] urandom
+  [chr] dipsw
+  [dir] fd
+  [link] stdin
+  [link] stdout
+  [link] stderr
+  [chr] deci_stdout
+  [chr] deci_stderr
+  [chr] deci_tty2
+  [chr] deci_tty3
+  [chr] deci_tty4
+  [chr] deci_tty5
+  [chr] deci_tty6
+  [chr] deci_tty7
+  [chr] deci_tty8
+  [chr] deci_tty9
+  [chr] deci_tty10
+  [chr] deci_tty11
+  [chr] deci_tty12
+  [chr] deci_tty13
+  [chr] deci_tty14
+  [chr] deci_ttya0
+  [chr] deci_ttyb0
+  [chr] deci_ttyc0
+  [chr] null
+  [chr] zero
+  [chr] deci_stdin
+  [chr] hmd2_cmd
+  [chr] hmd2_imu
+  [chr] hmd2_track
+  [chr] hmd2_leddet
+  [chr] hmd2_image
+  [chr] hmd2_gen_data
+  [chr] hmd2_slam_trace
+  [chr] hmd2_gaze
+  [chr] ctty
+  [chr] hmd_cmd
+  [chr] hmd_snsr
+  [chr] hmd_3da
+  [chr] hmd_dist
+  [chr] sce_zlib
+  [chr] bt
+  [chr] hid
+  [chr] mp3
+  [chr] dmem0
+  [chr] dmem1
+  [chr] dmem2
+  [chr] gc
+  [chr] ajmi
+  [chr] ajm
+  [chr] dce
+  [chr] rng
+  [chr] dbggc
+  [chr] sbl_srv
+  [chr] encdec
+  [chr] uvd_dec
+  [chr] uvd_enc
+  [chr] fttrm
+  [chr] duid
+  [chr] acm
+  [chr] gic
+  [chr] notification0
+  [chr] notification1
+  [chr] notification6
+  [chr] notification7
+  [chr] usbctl
+  [chr] camera
+  [chr] a53mm
+  [chr] a53mmsys
+  [dir] usb
+  [link] ugen0.1
+  [link] ugen1.1
+  [link] ugen2.1
+  [link] ugen0.2
+  [link] ugen2.2
+  [chr] lvd3
+
+--- /system: empty/inaccessible
+
+--- /system/common: empty/inaccessible
+
+--- /system/common/lib: empty/inaccessible
+
+--- /system/priv/lib: empty/inaccessible
+
+--- /system/sys: empty/inaccessible
+
+--- /system/vsh: empty/inaccessible
+
+--- /savedata0 (27 entries) ---
+  [dir] .
+  [dir] ..
+  [dir] sce_sys
+  [file] bit32.lua
+  [file] elfldr.elf
+  [file] globals.lua
+  [file] gpu.lua
+  [file] hash.lua
+  [file] inject.iet
+  [file] kernel_offset.lua
+  [file] kernel_patches_ps4.lua
+  [file] kernel.lua
+  [file] lua.lua
+  [file] main.lua
+  [file] memory.lua
+  [file] misc.lua
+  [file] native.lua
+  [file] offsets.lua
+  [file] ps5-elfldr.elf
+  [file] ps5-kexp.bin
+  [file] ropchain.lua
+  [file] saveg.dat
+  [file] signal.lua
+  [file] struct.lua
+  [file] syscall.lua
+  [file] thread.lua
+  [file] uint64.lua
+
+--- /app0 (8 entries) ---
+  [dir] .
+  [dir] ..
+  [dir] movie
+  [dir] sce_module
+  [file] eboot.bin
+  [file] root.pfs
+  [file] root.pfs.000
+  [file] sce_discmap.plt
+
+--- /app0/sce_module (13 entries) ---
+  [dir] .
+  [dir] ..
+  [file] libSceAudioLatencyEstimation.prx
+  [file] libSceFace.prx
+  [file] libSceFaceTracker.prx
+  [file] libSceFios2.prx
+  [file] libSceHand.prx
+  [file] libSceHandTracker.prx
+  [file] libSceHeadTracker.prx
+  [file] libSceJobManager.prx
+  [file] libSceNpToolkit2.prx
+  [file] libSceS3DConversion.prx
+  [file] libc.prx
+
+--- /data: empty/inaccessible
+
+--- /mnt: empty/inaccessible
+
+--- /mnt/usb0: empty/inaccessible
+
+--- /mnt/usb1: empty/inaccessible
+
+--- /mnt/sandbox: empty/inaccessible
+
+--- /proc: empty/inaccessible
+
+--- /system_ex: empty/inaccessible
+
+--- /system_ex/app: empty/inaccessible
+
+--- version files ---
+
+--- loaded modules ---
+  libSceAudioLatencyEstimation.prx
+  libSceFace.prx
+  libSceFaceTracker.prx
+  libSceFios2.prx
+  libSceHand.prx
+  libSceHandTracker.prx
+  libSceHeadTracker.prx
+  libSceJobManager.prx
+  libSceNpToolkit2.prx
+  libSceS3DConversion.prx
+  libc.prx
+
+--- sandbox check ---
+  /: 8 entries
+  /..: 8 entries
+  /system/vsh/app/NPXS20001: 0 entries
+  /user/home: 0 entries
+  /mnt/sandbox/pfsmnt: 0 entries
+
+=== FILE RECON DONE ===

@@ -1,0 +1,177 @@
+[*] Connecting to 10.0.0.96:9026...
+[*] Connected, sending 9154 bytes...
+[*] Waiting for response...
+=== 14.10 RECON: PS5 OPTS FUZZ ===
+fw: 14.10
+pid: 350
+
+--- PART 1: SOL_SOCKET full scan ---
+  found 23 accessible options
+  0x0001: len=4 val=0x00000000
+  0x0002: len=4 val=0x00000000
+  0x0004: len=4 val=0x00000000
+  0x0008: len=4 val=0x00000000
+  0x0010: len=4 val=0x00000000
+  0x0020: len=4 val=0x00000000
+  0x0040: len=4 val=0x00000000
+  0x0080: len=8 val=0x00000000
+  0x0100: len=4 val=0x00000000
+  0x0200: len=4 val=0x00000000
+  0x0400: len=4 val=0x00000000
+  0x0800: len=4 val=0x00000000
+  0x1001: len=4 val=0x00002000
+  0x1002: len=4 val=0x00002000
+  0x1003: len=4 val=0x00000800
+  0x1004: len=4 val=0x00000001
+  0x1005: len=16 val=0x00000000
+  0x1006: len=16 val=0x00000000
+  0x1007: len=4 val=0x00000000
+  0x1008: len=4 val=0x00000001
+  0x1011: len=4 val=0x00000000
+  0x1012: len=4 val=0x00000000
+  0x1013: len=4 val=0x00000000
+
+--- PART 2: PS5 custom opts fuzz ---
+  --- opt 0x2000 ---
+    get(len=0): rv=0 actual=0 val=0xdeade000
+    get(len=1): rv=0 actual=1 val=0xdeade000
+    get(len=4): rv=0 actual=4 val=0x00000000
+    get(len=8): rv=0 actual=4 val=0x00000000
+    get(len=16): rv=0 actual=4 val=0x00000000
+    get(len=64): rv=0 actual=4 val=0x00000000
+    get(len=256): rv=0 actual=4 val=0x00000000
+    set(0x0): rv=0 readback=0x00000000
+    set(0x1): rv=0 readback=0x00002000
+    set(0x2): rv=0 readback=0x00002000
+    set(0xff): rv=0 readback=0x00002000
+    set(0xffff): rv=0 readback=0x00002000
+    set(0x7fffffff): rv=0 readback=0x00002000
+    set(0x80000000): rv=0 readback=0x00002000
+    set(0xffffffff): rv=0 readback=0x00002000
+    set(len=0): rv=-1
+    set(len=1): rv=-1
+    set(len=8,qword): rv=0
+    readback qword: 0xdeaddead00002000 (len=4)
+    set(len=256): rv=0
+  --- opt 0x10000 ---
+    get(len=0): rv=0 actual=0 val=0xdeade000
+    get(len=1): rv=0 actual=1 val=0xdeade000
+    get(len=4): rv=0 actual=4 val=0x00000000
+    get(len=8): rv=0 actual=4 val=0x00000000
+    get(len=16): rv=0 actual=4 val=0x00000000
+    get(len=64): rv=0 actual=4 val=0x00000000
+    get(len=256): rv=0 actual=4 val=0x00000000
+    set(0x0): rv=0 readback=0x00000000
+    set(0x1): rv=0 readback=0x00010000
+    set(0x2): rv=0 readback=0x00010000
+    set(0xff): rv=0 readback=0x00010000
+    set(0xffff): rv=0 readback=0x00010000
+    set(0x7fffffff): rv=0 readback=0x00010000
+    set(0x80000000): rv=0 readback=0x00010000
+    set(0xffffffff): rv=0 readback=0x00010000
+    set(len=0): rv=-1
+    set(len=1): rv=-1
+    set(len=8,qword): rv=0
+    readback qword: 0xdeaddead00010000 (len=4)
+    set(len=256): rv=0
+  --- opt 0x20000 ---
+    get(len=0): rv=0 actual=0 val=0xdeade000
+    get(len=1): rv=0 actual=1 val=0xdeade000
+    get(len=4): rv=0 actual=4 val=0x00000000
+    get(len=8): rv=0 actual=4 val=0x00000000
+    get(len=16): rv=0 actual=4 val=0x00000000
+    get(len=64): rv=0 actual=4 val=0x00000000
+    get(len=256): rv=0 actual=4 val=0x00000000
+    set(0x0): rv=0 readback=0x00000000
+    set(0x1): rv=0 readback=0x00020000
+    set(0x2): rv=0 readback=0x00020000
+    set(0xff): rv=0 readback=0x00020000
+    set(0xffff): rv=0 readback=0x00020000
+    set(0x7fffffff): rv=0 readback=0x00020000
+    set(0x80000000): rv=0 readback=0x00020000
+    set(0xffffffff): rv=0 readback=0x00020000
+    set(len=0): rv=-1
+    set(len=1): rv=-1
+    set(len=8,qword): rv=0
+    readback qword: 0xdeaddead00020000 (len=4)
+    set(len=256): rv=0
+  --- opt 0x40000 ---
+    get(len=0): rv=0 actual=0 val=0xdeade000
+    get(len=1): rv=0 actual=1 val=0xdeade000
+    get(len=4): rv=0 actual=4 val=0x00000000
+    get(len=8): rv=0 actual=4 val=0x00000000
+    get(len=16): rv=0 actual=4 val=0x00000000
+    get(len=64): rv=0 actual=4 val=0x00000000
+    get(len=256): rv=0 actual=4 val=0x00000000
+    set(0x0): rv=0 readback=0x00000000
+    set(0x1): rv=0 readback=0x00040000
+    set(0x2): rv=0 readback=0x00040000
+    set(0xff): rv=0 readback=0x00040000
+    set(0xffff): rv=0 readback=0x00040000
+    set(0x7fffffff): rv=0 readback=0x00040000
+    set(0x80000000): rv=0 readback=0x00040000
+    set(0xffffffff): rv=0 readback=0x00040000
+    set(len=0): rv=-1
+    set(len=1): rv=-1
+    set(len=8,qword): rv=0
+    readback qword: 0xdeaddead00040000 (len=4)
+    set(len=256): rv=0
+  --- opt 0x100000 ---
+    get(len=0): rv=0 actual=0 val=0xdeade000
+    get(len=1): rv=0 actual=1 val=0xdeade000
+    get(len=4): rv=0 actual=4 val=0x00000000
+    get(len=8): rv=0 actual=4 val=0x00000000
+    get(len=16): rv=0 actual=4 val=0x00000000
+    get(len=64): rv=0 actual=4 val=0x00000000
+    get(len=256): rv=0 actual=4 val=0x00000000
+    set(0x0): rv=0 readback=0x00000000
+    set(0x1): rv=0 readback=0x00100000
+    set(0x2): rv=0 readback=0x00100000
+    set(0xff): rv=0 readback=0x00100000
+    set(0xffff): rv=0 readback=0x00100000
+    set(0x7fffffff): rv=0 readback=0x00100000
+    set(0x80000000): rv=0 readback=0x00100000
+    set(0xffffffff): rv=0 readback=0x00100000
+    set(len=0): rv=-1
+    set(len=1): rv=-1
+    set(len=8,qword): rv=0
+    readback qword: 0xdeaddead00100000 (len=4)
+    set(len=256): rv=0
+
+--- PART 3: PS5 opts on TCP ---
+  TCP 0x2000: len=4 val=0x00000000
+    set(1): rv=0 readback=0x00002000
+  TCP 0x10000: len=4 val=0x00000000
+    set(1): rv=0 readback=0x00010000
+  TCP 0x20000: len=4 val=0x00000000
+    set(1): rv=0 readback=0x00020000
+  TCP 0x40000: len=4 val=0x00000000
+    set(1): rv=0 readback=0x00040000
+  TCP 0x100000: len=4 val=0x00000000
+    set(1): rv=0 readback=0x00100000
+
+--- PART 3b: PS5 opts on RAW ---
+  RAW 0x2000: len=4 val=0x00000000
+    set(1): rv=0 readback=0x00002000
+  RAW 0x10000: len=4 val=0x00000000
+    set(1): rv=0 readback=0x00010000
+  RAW 0x20000: len=4 val=0x00000000
+    set(1): rv=0 readback=0x00020000
+  RAW 0x40000: len=4 val=0x00000000
+    set(1): rv=0 readback=0x00040000
+  RAW 0x100000: len=4 val=0x00000000
+    set(1): rv=0 readback=0x00100000
+
+--- PART 3c: PS5 opts on IPv6 RAW ---
+  V6RAW 0x2000: len=4 val=0x00000000
+  V6RAW 0x10000: len=4 val=0x00000000
+  V6RAW 0x20000: len=4 val=0x00000000
+  V6RAW 0x40000: len=4 val=0x00000000
+  V6RAW 0x100000: len=4 val=0x00000000
+
+--- PART 4: PS5 custom at other levels ---
+
+=== PS5 OPTS FUZZ DONE ===
+pid final: 350
+
+[*] Received 6083 bytes total

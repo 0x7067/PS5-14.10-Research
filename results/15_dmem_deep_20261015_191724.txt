@@ -1,0 +1,269 @@
+=== 14.10 RECON: DEVICE DEEP DIVE ===
+fw: 14.10
+pid: 203
+dmem0=22 gc=23 dce=24 ajm=25 hid=26 dipsw=27
+
+--- PART 1: dmem0 known ioctls ---
+
+  raw sequential scan 0-255...
+
+  mmap test on dmem0...
+    mmap SUCCESS at 0x3115a8000
+    data: 0x80000000c0012800 0xc000120080000000
+
+--- PART 2: dipsw ---
+  read() failed: [string "-- 14.10 Recon Probe 15: Deep d
+  IOR('S',0,4)                             rv=-1
+  IOR('S',1,4)                             rv=-1
+  IOR('S',2,4)                             rv=-1
+  IOR('S',3,4)                             rv=-1
+  IOR('S',4,4)                             rv=-1
+  IOR('S',5,4)                             rv=-1
+  IOR('S',6,4)                             rv=-1
+  IOR('S',7,4)                             rv=-1
+  IOR('S',8,4)                             rv=-1
+  IOR('S',9,4)                             rv=-1
+  IOR('S',10,4)                            rv=-1
+  IOR('S',11,4)                            rv=-1
+  IOR('S',12,4)                            rv=-1
+  IOR('S',13,4)                            rv=-1
+  IOR('S',14,4)                            rv=-1
+  IOR('S',15,4)                            rv=-1
+  IOR('S',16,4)                            rv=-1
+  IOR('S',17,4)                            rv=-1
+  IOR('S',18,4)                            rv=-1
+  IOR('S',19,4)                            rv=-1
+  IOR('S',20,4)                            rv=-1
+  IOR('S',21,4)                            rv=-1
+  IOR('S',22,4)                            rv=-1
+  IOR('S',23,4)                            rv=-1
+  IOR('S',24,4)                            rv=-1
+  IOR('S',25,4)                            rv=-1
+  IOR('S',26,4)                            rv=-1
+  IOR('S',27,4)                            rv=-1
+  IOR('S',28,4)                            rv=-1
+  IOR('S',29,4)                            rv=-1
+  IOR('S',30,4)                            rv=-1
+  IOR('S',31,4)                            rv=-1
+  IOR('D',0,4)                             rv=-1
+  IOR('D',1,4)                             rv=-1
+  IOR('D',2,4)                             rv=-1
+  IOR('D',3,4)                             rv=-1
+  IOR('D',4,4)                             rv=-1
+  IOR('D',5,4)                             rv=-1
+  IOR('D',6,4)                             rv=-1
+  IOR('D',7,4)                             rv=-1
+  IOR('D',8,4)                             rv=-1
+  IOR('D',9,4)                             rv=-1
+  IOR('D',10,4)                            rv=-1
+  IOR('D',11,4)                            rv=-1
+  IOR('D',12,4)                            rv=-1
+  IOR('D',13,4)                            rv=-1
+  IOR('D',14,4)                            rv=-1
+  IOR('D',15,4)                            rv=-1
+  IOR('D',16,4)                            rv=-1
+  IOR('D',17,4)                            rv=-1
+  IOR('D',18,4)                            rv=-1
+  IOR('D',19,4)                            rv=-1
+  IOR('D',20,4)                            rv=-1
+  IOR('D',21,4)                            rv=-1
+  IOR('D',22,4)                            rv=-1
+  IOR('D',23,4)                            rv=-1
+  IOR('D',24,4)                            rv=-1
+  IOR('D',25,4)                            rv=-1
+  IOR('D',26,4)                            rv=-1
+  IOR('D',27,4)                            rv=-1
+  IOR('D',28,4)                            rv=-1
+  IOR('D',29,4)                            rv=-1
+  IOR('D',30,4)                            rv=-1
+  IOR('D',31,4)                            rv=-1
+  IOR('d',0,4)                             rv=-1
+  IOR('d',1,4)                             rv=-1
+  IOR('d',2,4)                             rv=-1
+  IOR('d',3,4)                             rv=-1
+  IOR('d',4,4)                             rv=-1
+  IOR('d',5,4)                             rv=-1
+  IOR('d',6,4)                             rv=-1
+  IOR('d',7,4)                             rv=-1
+  IOR('d',8,4)                             rv=-1
+  IOR('d',9,4)                             rv=-1
+  IOR('d',10,4)                            rv=-1
+  IOR('d',11,4)                            rv=-1
+  IOR('d',12,4)                            rv=-1
+  IOR('d',13,4)                            rv=-1
+  IOR('d',14,4)                            rv=-1
+  IOR('d',15,4)                            rv=-1
+  IOR('d',16,4)                            rv=-1
+  IOR('d',17,4)                            rv=-1
+  IOR('d',18,4)                            rv=-1
+  IOR('d',19,4)                            rv=-1
+  IOR('d',20,4)                            rv=-1
+  IOR('d',21,4)                            rv=-1
+  IOR('d',22,4)                            rv=-1
+  IOR('d',23,4)                            rv=-1
+  IOR('d',24,4)                            rv=-1
+  IOR('d',25,4)                            rv=-1
+  IOR('d',26,4)                            rv=-1
+  IOR('d',27,4)                            rv=-1
+  IOR('d',28,4)                            rv=-1
+  IOR('d',29,4)                            rv=-1
+  IOR('d',30,4)                            rv=-1
+  IOR('d',31,4)                            rv=-1
+  IOR('s',0,4)                             rv=-1
+  IOR('s',1,4)                             rv=-1
+  IOR('s',2,4)                             rv=-1
+  IOR('s',3,4)                             rv=-1
+  IOR('s',4,4)                             rv=-1
+  IOR('s',5,4)                             rv=-1
+  IOR('s',6,4)                             rv=-1
+  IOR('s',7,4)                             rv=-1
+  IOR('s',8,4)                             rv=-1
+  IOR('s',9,4)                             rv=-1
+  IOR('s',10,4)                            rv=-1
+  IOR('s',11,4)                            rv=-1
+  IOR('s',12,4)                            rv=-1
+  IOR('s',13,4)                            rv=-1
+  IOR('s',14,4)                            rv=-1
+  IOR('s',15,4)                            rv=-1
+  IOR('s',16,4)                            rv=-1
+  IOR('s',17,4)                            rv=-1
+  IOR('s',18,4)                            rv=-1
+  IOR('s',19,4)                            rv=-1
+  IOR('s',20,4)                            rv=-1
+  IOR('s',21,4)                            rv=-1
+  IOR('s',22,4)                            rv=-1
+  IOR('s',23,4)                            rv=-1
+  IOR('s',24,4)                            rv=-1
+  IOR('s',25,4)                            rv=-1
+  IOR('s',26,4)                            rv=-1
+  IOR('s',27,4)                            rv=-1
+  IOR('s',28,4)                            rv=-1
+  IOR('s',29,4)                            rv=-1
+  IOR('s',30,4)                            rv=-1
+  IOR('s',31,4)                            rv=-1
+
+--- PART 3: gc (GPU) ---
+  read(): FAIL
+  IOR('G',0,256)                           rv=-1
+  IOR('G',1,256)                           rv=-1
+  IOR('G',2,256)                           rv=-1
+  IOR('G',3,256)                           rv=-1
+  IOR('G',4,256)                           rv=-1
+  IOR('G',5,256)                           rv=-1
+  IOR('G',6,256)                           rv=-1
+  IOR('G',7,256)                           rv=-1
+  IOR('G',8,256)                           rv=-1
+  IOR('G',9,256)                           rv=-1
+  IOR('G',10,256)                          rv=-1
+  IOR('G',11,256)                          rv=-1
+  IOR('G',12,256)                          rv=-1
+  IOR('G',13,256)                          rv=-1
+  IOR('G',14,256)                          rv=-1
+  IOR('G',15,256)                          rv=-1
+  IOR('g',0,256)                           rv=-1
+  IOR('g',1,256)                           rv=-1
+  IOR('g',2,256)                           rv=-1
+  IOR('g',3,256)                           rv=-1
+  IOR('g',4,256)                           rv=-1
+  IOR('g',5,256)                           rv=-1
+  IOR('g',6,256)                           rv=-1
+  IOR('g',7,256)                           rv=-1
+  IOR('g',8,256)                           rv=-1
+  IOR('g',9,256)                           rv=-1
+  IOR('g',10,256)                          rv=-1
+  IOR('g',11,256)                          rv=-1
+  IOR('g',12,256)                          rv=-1
+  IOR('g',13,256)                          rv=-1
+  IOR('g',14,256)                          rv=-1
+  IOR('g',15,256)                          rv=-1
+
+  mmap test on gc...
+    mmap SUCCESS at 0x3115a8000
+    first qword: 0xffffffffffffffff
+
+--- PART 4: dce ---
+  IOR('D',0,64)                            rv=-1
+  IOR('D',1,64)                            rv=-1
+  IOR('D',2,64)                            rv=-1
+  IOR('D',3,64)                            rv=-1
+  IOR('D',4,64)                            rv=-1
+  IOR('D',5,64)                            rv=-1
+  IOR('D',6,64)                            rv=-1
+  IOR('D',7,64)                            rv=-1
+  IOR('D',8,64)                            rv=-1
+  IOR('D',9,64)                            rv=-1
+  IOR('D',10,64)                           rv=-1
+  IOR('D',11,64)                           rv=-1
+  IOR('D',12,64)                           rv=-1
+  IOR('D',13,64)                           rv=-1
+  IOR('D',14,64)                           rv=-1
+  IOR('D',15,64)                           rv=-1
+  IOR('d',0,64)                            rv=-1
+  IOR('d',1,64)                            rv=-1
+  IOR('d',2,64)                            rv=-1
+  IOR('d',3,64)                            rv=-1
+  IOR('d',4,64)                            rv=-1
+  IOR('d',5,64)                            rv=-1
+  IOR('d',6,64)                            rv=-1
+  IOR('d',7,64)                            rv=-1
+  IOR('d',8,64)                            rv=-1
+  IOR('d',9,64)                            rv=-1
+  IOR('d',10,64)                           rv=-1
+  IOR('d',11,64)                           rv=-1
+  IOR('d',12,64)                           rv=-1
+  IOR('d',13,64)                           rv=-1
+  IOR('d',14,64)                           rv=-1
+  IOR('d',15,64)                           rv=-1
+  IOR('E',0,64)                            rv=-1
+  IOR('E',1,64)                            rv=-1
+  IOR('E',2,64)                            rv=-1
+  IOR('E',3,64)                            rv=-1
+  IOR('E',4,64)                            rv=-1
+  IOR('E',5,64)                            rv=-1
+  IOR('E',6,64)                            rv=-1
+  IOR('E',7,64)                            rv=-1
+  IOR('E',8,64)                            rv=-1
+  IOR('E',9,64)                            rv=-1
+  IOR('E',10,64)                           rv=-1
+  IOR('E',11,64)                           rv=-1
+  IOR('E',12,64)                           rv=-1
+  IOR('E',13,64)                           rv=-1
+  IOR('E',14,64)                           rv=-1
+  IOR('E',15,64)                           rv=-1
+
+--- PART 5: notification0 ---
+  fd=28
+  read(): FAIL
+  IOR('N',0,256)                           rv=-1
+  IOR('N',1,256)                           rv=-1
+  IOR('N',2,256)                           rv=-1
+  IOR('N',3,256)                           rv=-1
+  IOR('N',4,256)                           rv=-1
+  IOR('N',5,256)                           rv=-1
+  IOR('N',6,256)                           rv=-1
+  IOR('N',7,256)                           rv=-1
+  IOR('N',8,256)                           rv=-1
+  IOR('N',9,256)                           rv=-1
+  IOR('N',10,256)                          rv=-1
+  IOR('N',11,256)                          rv=-1
+  IOR('N',12,256)                          rv=-1
+  IOR('N',13,256)                          rv=-1
+  IOR('N',14,256)                          rv=-1
+  IOR('N',15,256)                          rv=-1
+
+--- PART 6: PS5-specific ioctl scan ---
+  sceKernelAllocateDirectMemory            rv=-1
+  sceKernelMapDirectMemory?                rv=-1
+  sceKernelGetDirectMemorySize?            rv=-1
+  sceKernelAllocateMainDirectMemory?       rv=-1
+  sceKernelBatchMap?                       rv=-1
+  sceKernelCheckedReleaseDirectMemory?     rv=-1
+  sceKernelDirectMemoryQuery?              rv=-1
+  sceKernelAvailableDirectMemory?          rv=-1
+  gc submit?                               rv=-1
+  gc query?                                rv=-1
+  gc map?                                  rv=-1
+  gc info?                                 rv=-1
+
+=== DEVICE DEEP DIVE DONE ===
+pid final: 203

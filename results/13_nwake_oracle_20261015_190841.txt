@@ -1,0 +1,75 @@
+=== 14.10 RECON: NWAKE KERNEL ORACLE ===
+fw: 14.10
+pid: 196
+
+--- PART 1: timing baseline ---
+  userspace addr: min=66473 med=68238 max=283295 ns
+  kernel text:    min=66153 med=68478 max=299573 ns
+  unmapped:       min=66153 med=67596 max=192926 ns
+  NULL:           min=65832 med=67757 max=222916 ns
+
+--- PART 2: WAKE_PRIVATE single-addr oracle ---
+  userspace                min=65832 med=69441 max=383687 ns
+  kernel text              min=66714 med=68639 max=268622 ns
+  DMAP base                min=66715 med=68238 max=258037 ns
+  unmapped high            min=66714 med=68318 max=253225 ns
+  NULL                     min=66393 med=67597 max=451043 ns
+  addr=1                   min=67917 med=69360 max=233419 ns
+
+--- PART 3: kernel text KASLR scan ---
+  fastest (possibly mapped):
+    0xffffffff8a200000: 67756 ns
+    0xffffffff89c00000: 67757 ns
+    0xffffffff87c00000: 67757 ns
+    0xffffffff8be00000: 67757 ns
+    0xffffffff89e00000: 67836 ns
+    0xffffffff88200000: 67837 ns
+    0xffffffff8a600000: 67837 ns
+    0xffffffff89000000: 67837 ns
+    0xffffffff88c00000: 67837 ns
+    0xffffffff8a800000: 67917 ns
+  slowest (possibly unmapped):
+    0xffffffff83e00000: 74893 ns
+    0xffffffff8f400000: 75294 ns
+    0xffffffff8ae00000: 75615 ns
+    0xffffffff8f600000: 76337 ns
+    0xffffffff8da00000: 76417 ns
+
+--- PART 4: DMAP region scan ---
+  0xfffff80000000000: 68318 ns
+  0xfffff80040000000: 68238 ns
+  0xfffff80080000000: 68078 ns
+  0xfffff800c0000000: 68158 ns
+  0xfffff80100000000: 68158 ns
+  0xfffff80140000000: 67997 ns
+  0xfffff80180000000: 68238 ns
+  0xfffff801c0000000: 68077 ns
+  0xfffff80200000000: 68078 ns
+  0xfffff80240000000: 67837 ns
+  0xfffff80280000000: 67917 ns
+  0xfffff802c0000000: 68318 ns
+  0xfffff80300000000: 68398 ns
+  0xfffff80340000000: 68238 ns
+  0xfffff80380000000: 68078 ns
+  0xfffff803c0000000: 67917 ns
+  0xfffff80400000000: 67837 ns
+
+--- PART 5: return value analysis ---
+  userspace valid                rv=-1
+  NULL                           rv=-1
+  addr=1                         rv=-1
+  addr=0x1000                    rv=-1
+  kern text +200000              rv=-1
+  kern text +2000000             rv=-1
+  kern text +4000000             rv=-1
+  kern high                      rv=-1
+  DMAP base                      rv=-1
+  DMAP +4GB                      rv=-1
+  DMAP +8GB                      rv=-1
+  DMAP +16GB                     rv=-1
+  DMAP +32GB (past RAM)          rv=-1
+  unmapped high                  rv=-1
+  kernel base                    rv=-1
+
+=== NWAKE ORACLE DONE ===
+pid final: 196

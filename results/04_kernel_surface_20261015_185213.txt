@@ -1,0 +1,74 @@
+=== 14.10 RECON: KERNEL ATTACK SURFACE ===
+fw: 14.10
+
+--- TEST 1: umtx_op ---
+  LOCK (0): OK
+  UNLOCK (1): OK
+  WAKE (3): OK
+  CV_SIGNAL (9): OK
+  CV_BROADCAST (10): OK
+  WAIT_UINT_PRIVATE (15): OK
+  WAKE_PRIVATE (16): OK
+  MUTEX_WAIT (17): OK
+  MUTEX_WAKE (18): OK
+  SEM_WAKE (20): OK
+  NWAKE_PRIVATE (21): OK
+  MUTEX_WAKE2 (22): OK
+  SEM2_WAKE (24): OK
+  SHM (25): OK
+  ROBUST_LISTS (26): OK
+
+--- TEST 3: IPv6 socket options ---
+  IPv6 UDP socket: fd=22
+    IPV6_HOPOPTS: SETTABLE
+    IPV6_DSTOPTS: SETTABLE
+    IPV6_RTHDR: SETTABLE
+    IPV6_PKTOPTIONS: SETTABLE
+    IPV6_RECVHOPOPTS: SETTABLE
+    IPV6_RECVDSTOPTS: SETTABLE
+    IPV6_RECVRTHDR: SETTABLE
+    HOPOPTS size=256: ACCEPTED (!)
+    HOPOPTS size=1024: ACCEPTED (!)
+    HOPOPTS size=4096: ACCEPTED (!)
+    GET IPV6_PKTOPTIONS: 4096 bytes returned
+    GET IPV6_RECVHOPOPTS: 4 bytes returned
+    GET IPV6_RECVDSTOPTS: 4 bytes returned
+    GET IPV6_RECVRTHDR: 4 bytes returned
+
+--- TEST 4: sysctl info ---
+  kern.ostype = FreeBSD
+  kern.osrelease = 0.0-prototype
+  kern.version = r230171/releases/14.10 Sep 28 2026 02:18:33
+  kern.hostname = 
+  hw.machine = amd64
+  hw.model = 100-000000189                                  
+  hw.ncpu = 
+  hw.pagesize = 
+  kern.proc.pathname(self): size=0
+
+--- TEST 5: device access ---
+  /dev/null: OPEN fd=22
+  /dev/zero: OPEN fd=22
+  /dev/urandom: OPEN fd=22
+  /dev/klog: DENIED (-1)
+  /dev/console: DENIED (-1)
+  /dev/dmem0: OPEN fd=22
+  /dev/dmem1: OPEN fd=22
+  /dev/dmem2: OPEN fd=22
+  /dev/dipsw: OPEN fd=22
+  /dev/gc: OPEN fd=22
+  /dev/hid: OPEN fd=22
+  /dev/ajm: OPEN fd=22
+  /dev/notification0: OPEN fd=22
+  /dev/camera: OPEN fd=22
+  /dev/deci_tty6: DENIED (-1)
+  /dev/deci_tty7: DENIED (-1)
+
+--- TEST 6: mmap/mprotect ---
+  anon mmap: 0x31075c000
+  mprotect RWX: -1 (denied)
+
+--- TEST 7: shm_open2 ---
+  shm_open2: -1
+
+=== KERNEL SURFACE DONE ===

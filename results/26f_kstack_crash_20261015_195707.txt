@@ -1,0 +1,16 @@
+=== 14.10 RECON: KSTACK CRASH TEST ===
+fw: 14.10
+pid: 322
+
+--- PART 1: memory layout ---
+  heap: 0x310e47260
+  low mmap: 0x10000
+
+--- PART 2: KERNEL ALTSTACK TEST ---
+  if you see crash handler output after this: sendsig fell back
+  if connection drops: copyout rejected kernel addr
+  set kernel altstack: true
+  verified: 0xfffff80010000000
+  handler=0x533118f4 SA_ONSTACK|SA_SIGINFO
+
+>>> SENDING SIGUSR1 WITH KERNEL ALTSTACK <<<

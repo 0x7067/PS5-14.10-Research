@@ -1,0 +1,56 @@
+=== 14.10 RECON: SIGNAL STRESS ===
+fw: 14.10
+pid: 266
+
+--- PART 1: sigaction survey ---
+  summary: DFL=26 IGN=0 custom=5
+  checking old_sa padding for leaks...
+    +16: 0xffffffffffffffff *** KERNEL LEAK ***
+
+--- PART 2: sigaltstack ---
+  current: sp=0x0000000000000000 size=0x0 flags=0x4
+
+  testing altstack sizes...
+    size=0      rv=-1
+    size=1      rv=-1
+    size=256    rv=-1
+    size=2048   rv=0
+    size=4096   rv=0
+    size=8192   rv=0
+    size=16384  rv=0
+    size=32768  rv=0
+    size=65536  rv=0
+
+  testing altstack with bad pointers...
+    kernel text     rv=0
+    DMAP base       rv=0
+    low addr        rv=0
+
+--- PART 3: sigprocmask ---
+  current mask: 0x0000000000000000
+  block all: OK
+
+--- PART 4: sigreturn probing ---
+  sigreturn syscall 417 resolved: OK
+  (not calling â€” would corrupt execution state)
+
+--- PART 5: sysctl info extraction ---
+  kern.ostype               len=4096 int=0 (0x0)
+  kern.osrelease            len=4096 int=0 (0x0)
+  kern.version              len=4096 int=0 (0x0)
+  kern.osreldate            len=4096 int=0 (0x0)
+  kern.hostname             len=4096 int=0 (0x0)
+  kern.maxproc              len=4096 int=0 (0x0)
+  kern.maxfiles             len=4096 int=0 (0x0)
+  hw.machine                len=4096 int=0 (0x0)
+  hw.model                  len=4096 int=0 (0x0)
+  hw.ncpu                   len=4096 int=0 (0x0)
+  hw.physmem                len=4096 int=0 (0x0)
+  hw.pagesize               len=4096 int=0 (0x0)
+  machdep.1                 len=4096 int=0 (0x0)
+  machdep.2                 len=4096 int=0 (0x0)
+
+--- PART 6: sysctl scan ---
+
+=== SIGNAL STRESS DONE ===
+pid final: 266

@@ -1,0 +1,20 @@
+=== 14.10 RECON: AIO PIPES FIX ===
+fw: 14.10
+pid: 231
+
+--- PART 1: pipe creation methods ---
+  pipe(ptr): rv=22 ptr[0]=65535 ptr[1]=65535
+  pipe didn't write to ptr â€” rv=22 might be rfd
+  pipe rv=22 â€” might be rfd only, wfd lost
+
+  trying socketpair(AF_UNIX, SOCK_STREAM)...
+  socketpair: rv=0 fd[0]=22 fd[1]=24
+  socketpair works! fd0=22 fd1=24
+
+  trying /dev/null...
+  /dev/null fd=25
+
+--- PART 2: aio_read test ---
+  using socketpair fds: read=22 write=24
+  write 32 bytes: rv=32
+  submitting aio_read...

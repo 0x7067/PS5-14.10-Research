@@ -1,0 +1,58 @@
+=== 14.10 RECON: BUG HUNT ===
+fw: 14.10
+pid: 196
+
+--- HUNT 1: kqueue edge cases ---
+
+--- HUNT 2: aio race surface ---
+  aio_read(pipe): accepted
+  aio_multi_wait(NULL): OK
+  aio_multi_cancel(pipe): OK
+
+--- HUNT 3: IPv6 option handling ---
+  IPv6 socket: fd=24
+  IPV6_PKTINFO size=4: ACCEPTED
+  IPV6_PKTINFO size=256: ACCEPTED
+  IPV6_PKTINFO size=4096: ACCEPTED
+  IPV6_HOPLIMIT size=4: ACCEPTED
+  IPV6_HOPLIMIT size=256: ACCEPTED
+  IPV6_HOPLIMIT size=4096: ACCEPTED
+  IPV6_NEXTHOP size=4: ACCEPTED
+  IPV6_NEXTHOP size=256: ACCEPTED
+  IPV6_NEXTHOP size=4096: ACCEPTED
+  IPV6_HOPOPTS size=4: ACCEPTED
+  IPV6_HOPOPTS size=256: ACCEPTED
+  IPV6_HOPOPTS size=4096: ACCEPTED
+  IPV6_DSTOPTS size=4: ACCEPTED
+  IPV6_DSTOPTS size=256: ACCEPTED
+  IPV6_DSTOPTS size=4096: ACCEPTED
+  IPV6_RTHDR size=4: ACCEPTED
+  IPV6_RTHDR size=256: ACCEPTED
+  IPV6_RTHDR size=4096: ACCEPTED
+  IPV6_AUTOFLOWLABEL size=4: ACCEPTED
+  IPV6_AUTOFLOWLABEL size=256: ACCEPTED
+  IPV6_AUTOFLOWLABEL size=4096: ACCEPTED
+  GET IPV6_PKTINFO: returned 20 bytes
+  GET IPV6_HOPLIMIT: returned 8192 bytes
+  GET IPV6_AUTOFLOWLABEL: returned 4 bytes
+
+--- HUNT 4: mmap edge cases ---
+  MAP_SHARED|MAP_ANON: 0x31075c000
+  mprotect RWX: -1
+  MAP_FIXED@0x10000: 0x10000
+
+--- HUNT 5: device ioctl surface ---
+  /dev/null: no ioctls accepted
+  /dev/zero: no ioctls accepted
+  /dev/urandom: no ioctls accepted
+
+--- HUNT 6: fd passing surface ---
+  pipe: r=0 w=0
+  100 pipes created (fd=0)
+  max pipes before failure: 100
+
+=== BUG HUNT SUMMARY ===
+Key findings above show which attack surfaces are live on 14.10.
+Priority targets: aio_multi_*, kqueueex, IPv6 opts, umtx_op
+
+=== BUG HUNT DONE ===

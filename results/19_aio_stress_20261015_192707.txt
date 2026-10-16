@@ -1,0 +1,9 @@
+=== 14.10 RECON: AIO STRESS ===
+fw: 14.10
+pid: 217
+
+--- PART 1: setup pipes ---
+  created 20/20 pipe pairs
+  wrote 64 bytes into each pipe
+
+--- PART 2: basic aio_read ---

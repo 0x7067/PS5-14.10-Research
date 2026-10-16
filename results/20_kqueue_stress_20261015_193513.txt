@@ -1,0 +1,65 @@
+=== 14.10 RECON: KQUEUE STRESS ===
+fw: 14.10
+pid: 266
+
+--- PART 1: kqueue creation ---
+  kqueue: fd=22
+
+--- PART 2: create pipe FDs ---
+  pipes created: 0
+  falling back to socketpair...
+  socketpairs created: 10
+
+--- PART 3: kevent registration ---
+  kevent register 10 READ filters: rv=0
+
+--- PART 4: trigger and poll events ---
+  kevent poll: 3 events
+    event[0]: fd=23 filter=0xffff flags=0x0000 data=8 udata=1
+    event[1]: fd=25 filter=0xffff flags=0x0000 data=8 udata=2
+    event[2]: fd=27 filter=0xffff flags=0x0000 data=8 udata=3
+
+--- PART 5: close-while-registered ---
+  closing rfd=23 (has kevent registered)
+  after close: 2 events
+    event[0]: fd=25 flags=0x0000
+    event[1]: fd=27 flags=0x0000
+  re-register closed fd: rv=1
+
+--- PART 6: register/delete churn ---
+  200 rounds: ok=200 err=0
+
+--- PART 7: multi-kqueue same fd ---
+  kqueues: 5
+  register on kq[1]=22: OK
+  register on kq[2]=23: OK
+  register on kq[3]=43: OK
+  register on kq[4]=44: OK
+  register on kq[5]=45: OK
+  kq[1] poll: 1 events
+  kq[2] poll: 1 events
+  kq[3] poll: 1 events
+  kq[4] poll: 1 events
+  kq[5] poll: 1 events
+  closing target rfd=25
+  kq[1] after close: 0 events
+  kq[2] after close: 0 events
+  kq[3] after close: 0 events
+  kq[4] after close: 0 events
+  kq[5] after close: 0 events
+
+--- PART 8: close kqueue with pending events ---
+  closed kqueue with 8 pending events
+  alive: true
+
+--- PART 9: EVFILT_PROC ---
+  EVFILT_PROC(self, NOTE_FORK): rv=0
+  EVFILT_PROC(pid=1, NOTE_FORK): rv=0
+
+--- PART 10: EVFILT_TIMER ---
+  registered 50/50 timers
+  timer events: 9
+  deleted 50 timers
+
+=== KQUEUE STRESS DONE ===
+pid final: 266
