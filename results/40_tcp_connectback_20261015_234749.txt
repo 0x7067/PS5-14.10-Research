@@ -1,0 +1,9 @@
+=== 40: TCP CONNECT-BACK ===
+fw: 14.10
+pid: 521
+target: 10.0.0.231:31337
+socket: fd=150
+connecting (may block briefly)...
+connect: rv=-1
+connect failed — is tcp_fuzz_server.py running and PC_IP right?
+=== 40 DONE (no connect) ===

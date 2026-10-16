@@ -102,8 +102,9 @@ The PS5 14.10 sandbox eliminates the three most common FreeBSD kernel exploit st
 
 ## Next Priorities
 
-1. **Tier 2 TCP connect-back** (probe 40 + tcp_fuzz_server.py) — the biggest untested kernel parser. Needs scapy on the PC.
-2. **IP options from the real network** — PC sends malformed-option packets to the PS5's LAN IP; PS5-side probe just watches a listener. Reaches input-side ip_dooptions without output validation.
-3. **SCTP** — `socket(AF_INET, SOCK_STREAM, 132)` untested; SCTP is a huge parser with a bad CVE history on BSD.
-4. **ip_reass deeper fuzz** — queue exhaustion (send 64+ distinct fragment trains without completing them), reassembly timeout interaction, MF-flag-on-last-fragment, zero-length final fragment.
-5. **ktimer abuse** — arm a timer with SIGEV_SIGNAL + signo for an ignored/blocked signal and observe delivery; settime on one timer while another fires (no threads, but signal handlers are reentrant).
+1. **Re-test "blocked" syscalls via `make_syscall()`** — 41w proved sysctl works through the raw path while resolve() says blocked. If the filter is in the resolve path, threading/AIO/ioctl may actually work — threading alone reopens the entire race-condition bug class. **Highest value per probe-minute.**
+2. **Tier 2 TCP connect-back — DONE (2026-10-16).** Fake-IP ARP-responder technique works; full handshake + 26 malformed segments delivered, console stable. Next: expand variant space (TCP timestamp parsing edge cases, PAWS, MD5/sig option kind 19, long option chains, TCP-AO kind 29).
+3. **IP options from the real network** — PC sends malformed-option packets to the PS5's LAN IP; PS5-side probe just watches a listener. Reaches input-side ip_dooptions without output validation.
+4. **SCTP** — `socket(AF_INET, SOCK_STREAM, 132)` untested; SCTP is a huge parser with a bad CVE history on BSD.
+5. **ip_reass deeper fuzz** — queue exhaustion (send 64+ distinct fragment trains without completing them), reassembly timeout interaction, MF-flag-on-last-fragment, zero-length final fragment.
+6. **ktimer abuse** — arm a timer with SIGEV_SIGNAL + signo for an ignored/blocked signal and observe delivery; settime on one timer while another fires (no threads, but signal handlers are reentrant).

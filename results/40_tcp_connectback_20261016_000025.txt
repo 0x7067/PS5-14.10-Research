@@ -1,0 +1,12 @@
+=== 40: TCP CONNECT-BACK ===
+fw: 14.10
+pid: 528
+target: 10.0.0.250:31337
+socket: fd=22
+connecting (may block briefly)...
+connect: rv=0
+CONNECTED — entering receive loop
+iter 1: recv=64 flags=0x0 data=4141414141414141414141414141414141414141414141414141414141414141
+NOTE: a console hang/reboot during the loop = malformed TCP hit a
+kernel path. Check the PC-side log for which variant was in flight.
+=== 40 DONE ===

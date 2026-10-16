@@ -4,9 +4,13 @@ Systematic kernel attack surface mapping and exploit primitive development on Pl
 
 **Goal chain:** Userland code exec → Kernel R/W → Hypervisor bypass
 
-## Current Status: ROP Chain Hijack Confirmed
+## Current Status: Userland Arbitrary-Call Confirmed
 
-All userland exploit primitives confirmed working. **The loader's live ROP chain is fully writable from the heap primitive** — both the function call target and all argument slots can be overwritten and restored without crashing the process. Kernel R/W is one probe away.
+All userland exploit primitives confirmed working. **The loader's live ROP chain is fully writable from the heap primitive** — both the function call target and all argument slots can be overwritten and restored without crashing the process.
+
+**Critical assessment (read before celebrating):** controlling ROP-chain argument slots gives arbitrary *syscall invocation*, not kernel memory access. `sysctl` only returns the OIDs Sony chose to expose, and kernel objects (socket structs, uma zones) do not live in the userland heap (41x). "copyout/copyin gadgets" cannot be called from userland ROP — they are kernel functions. Closing the gap to kernel R/W still requires a kernel memory disclosure (leaky OID / info-leak bug) or a kernel corruption bug — which is what the network input path program (below) hunts.
+
+**Open question with big consequences:** 41w's sysctl succeeded via `make_syscall()` while early probes declared sysctl "blocked" via `syscall.resolve()`. The sandbox filter may live in the resolve path, not the kernel. If so, every "blocked" verdict (threading, AIO, ioctl, dup) needs re-testing through the raw path — threading alone would reopen the entire race-condition bug class.
 
 ### Confirmed Primitives
 
@@ -138,6 +142,22 @@ RAW socket + IP_HDRINCL confirmed working. Fragment reassembly testing. IP optio
 ### Phase 7: Heap Exploitation (Probes 40–41z)
 GPU mmap boundary discovery, heap adjacency exploitation, object identification, vtable analysis, ASLR bypass via dynlib_get_info, ROP gadget extraction, loader chain reverse engineering, kernel R/W infrastructure.
 
+### Phase 8: Network Input Path — Live Results (Probes 36–40, 42a–42b)
+Kernel parsers reachable via RAW socket injection and attacker-controlled TCP. Run live against the console on 2026-10-15/16.
+
+| Probe | Result |
+|-------|--------|
+| 36 | **Port bind policy mapped:** <1024 and ≥40000 blocked; 1024–32767 open. Solves the 35/35b fragment-test blocker. |
+| 39 | `ip_reass()` correct on all 7 standard cases (baseline, out-of-order, overlap, tiny-first, dup-final, 9-frag chain, non-UDP control). Basic frag attacks dead; queue-exhaustion/timeout fuzz still open. |
+| 37 | Malformed IP option lengths are **rejected in `ip_output()`** before reaching `ip_dooptions()` — loopback can't deliver length-confusion packets. LSRR/SSRR/TS-overflow are processed and dropped. Input-side option fuzzing must come from the real network. |
+| 40 | **TCP connect-back fuzz WORKS end-to-end.** PC impersonates a fake LAN host (`tools/run_session40.py`: ARP responder + raw packets from an unowned IP, so the Windows stack never RSTs). Full handshake + 26 malformed segments (SACK with impossible blocks, URG+max urgptr, seq overlap, all-flags, RST-with-data) delivered; console stable. Bigger variant space is the next step. |
+| 42a | **ktimer surface partially open:** `ktimer_create` (clocks 0+4), `ktimer_settime`, `ktimer_getoverrun` work; `gettime`/`delete` blocked; validation correct; cap 27 timers. |
+| 42b | `memfd_create` is a stub (fake fd=1). **`msync` = instant process kill** — with `minherit` (probe 38), both probe-29/30 killers are now identified. |
+
+**Crash handler = ASLR oracle:** every SIGSEGV emits a ~280-byte record (magic `0x13371337`) leaking the fault address, heap registers, and the main module's code base for that process.
+
+**41m–41q vtable chase closed:** `0x1A3A4EE0` is unmapped; zero matching objects exist in fresh sessions — the 41k-era "objects" were heap-spray artifacts. Dead end, do not revisit without recreating spray conditions.
+
 ## Key Probe Results
 
 | Probe | Finding |
@@ -164,9 +184,15 @@ GPU mmap boundary discovery, heap adjacency exploitation, object identification,
 PYTHONIOENCODING=utf-8 python tools/send_probe.py --save probes/<probe_name>.lua
 
 # Results are saved to results/<probe_name>_<timestamp>.txt
+
+# TCP connect-back fuzz session (probe 40 + PC-side raw packet server,
+# fake-IP ARP responder so the host OS doesn't RST the connection):
+python tools/run_session40.py --ps5-ip 10.0.0.96 --fake-ip 10.0.0.250
 ```
 
 The loader expects an 8-byte LE uint64 length prefix followed by raw Lua source on TCP port 9026.
+
+**Long-running probe tips (learned live):** the loader spawns a fresh process per connection (fresh ASLR — derive all addresses from `memory.alloc` anchors, never hardcode); the mapped heap ends in a guard page, so scan DOWN from known-mapped memory; print progress every ≤30s or the socket recv timeout kills the session (this is what killed probe 41n).
 
 ### Critical Lua Constraints
 
