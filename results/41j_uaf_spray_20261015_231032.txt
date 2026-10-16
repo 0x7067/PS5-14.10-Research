@@ -1,0 +1,9 @@
+=== PROBE 41j: UAF SPRAY ===
+
+anchor: 0x310878000
+
+--- STEP 1: FIND DANGLING CONTAINERS ---
+dangling containers: 0
+
+no dangling targets found this run
+=== PROBE 41j COMPLETE ===

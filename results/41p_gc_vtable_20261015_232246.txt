@@ -1,0 +1,60 @@
+=== PROBE 41p: GC VTABLE TRIGGER ===
+
+anchor=0x310E6C000 fake_vt=0x310E70000
+--- FIND VICTIM ---
+victim=0x310DC3030 vtable=00000001_D5F10EE0
+victim dump:
+  +00: 00000001_D5F10EE0
+  +10: AFAFAFAF_AFAFAFAF
+  +18: F0AFAFAF_AFAFAFAF
+  +20: 00000001_D5F10EE0
+  +28: 00000000_00000B01
+  +30: 00000003_10D412F0
+  +38: 00000003_10BA82D0
+  +58: 40100000_00000006
+  +60: 00000003_00000003
+  +68: 00000003_10B19860
+  +70: 00000000_00000004
+  +78: 00000003_10DC3060
+
+--- BUILD FAKE VTABLE ---
+  [+00] 00000000_41410000
+  [+08] 00000000_41410010
+  [+10] 00000000_41410020
+  [+18] 00000000_41410030
+  [+20] 00000000_41410040
+  [+28] 00000000_41410050
+  [+30] 00000000_41410060
+  [+38] 00000000_41410070
+
+--- REDIRECT ---
+victim+00=00000003_10E70000
+
+--- GC TRIGGERS ---
+5a: collectgarbage('collect')
+  result: ok=true err=0
+  vt[0]=00000000_41410000
+5b: step GC x10
+  vt[0]=00000000_41410000
+5c: allocation pressure (1000 tables)
+  vt[0]=00000000_41410000
+5d: free + GC
+  vt[0]=00000000_41410000
+5e: string pressure
+  vt[0]=00000000_41410000
+5f: userdata via memory.alloc
+  vt[0]=00000000_41410000
+5g: coroutine pressure
+  vt[0]=00000000_41410000
+5h: aggressive GC config
+  vt[0]=00000000_41410000
+
+--- VICTIM STATE ---
+victim+00: 00000003_10E70000
+still points to fake vtable (GC did not deref via +00)
+fake vtable check:
+  all slots intact — vtable was NOT dereferenced by GC
+
+--- RESTORE ---
+restored: 00000001_D5F10EE0
+=== PROBE 41p COMPLETE ===

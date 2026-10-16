@@ -1,0 +1,29 @@
+=== PROBE 40: GPU/CPU DMEM BOUNDARY SCANNER ===
+
+--- SECTION 1: DIRECT MEMORY POOL STATS ---
+  total dmem pool  : 0xFFFFFFFFFFFFFFFFFFFFFFFF (-0.0 MB)
+  available dmem   : 0x0000000000000000 (0.0 MB)
+
+--- SECTION 2.1: 4KB  (1 page) ---
+  alloc return     : -1
+  phys addr        : 0x0000000000000000
+  alloc returned non-zero, skipping
+
+--- SECTION 2.2: 64KB (16 pages) ---
+  alloc return     : -1
+  phys addr        : 0x0000000000000000
+  alloc returned non-zero, skipping
+
+--- SECTION 2.3: 2MB  (large) ---
+  alloc return     : -1
+  phys addr        : 0x0000000000000000
+  alloc returned non-zero, skipping
+
+--- SECTION 3: GPU-ONLY MAPPING TEST ---
+  gpu-only alloc failed: 0xffffffffffffffffffffffff
+
+--- SECTION 4: POST-RELEASE POOL STATS ---
+  total dmem pool  : 0xFFFFFFFFFFFFFFFFFFFFFFFF
+  available dmem   : 0x0000000000000000 (0.0 MB)
+
+=== PROBE 40 COMPLETE ===

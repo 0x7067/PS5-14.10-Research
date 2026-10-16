@@ -1,0 +1,147 @@
+=== PROBE 41i: OBJECT IDENTIFICATION ===
+
+anchor: 0x310924000
+
+--- PASS 1: COLLECT rc=4 OBJECTS ---
+found: 32 objects
+
+--- PASS 2: OBJECT FIELD COMPARISON ---
+  #01 0x31087B040: tag=0xCF51 flg=0x3 tgt[0]=00000001_42621948
+  #02 0x310879480: tag=0xA1 flg=0x142621838 tgt[0]=AFAFAFAF_AFAFAFAF
+  #03 0x310875340: tag=0x23 flg=0x100000003 tgt[0]=00000003_108752F0
+  #04 0x310875780: tag=0x67 flg=0x4020000001000000 tgt[0]=00000003_1082CDF0
+  #05 0x31086D280: tag=0x2C21 flg=0x31086D290 tgt[0]=00000000_00000000
+  #06 0x31086DA80: tag=0x2421 flg=0x3108490B0 tgt[0]=00000003_10825850
+  #07 0x31086C7C0: tag=0x36E1 flg=0x31086C7D0 tgt[0]=00000003_1086C770
+  #08 0x31086B900: tag=0x45A1 flg=0x31086B910 tgt[0]=00000001_42621908
+  #09 0x31086B9C0: tag=0x44E1 flg=0x31086B9D0 tgt[0]=00000003_107DC400
+  #10 0x310867440: tag=0xB41 flg=0x31062B4B0 tgt[0]=00000003_10632450
+  #11 0x310867D00: tag=0x281 flg=0x310867D10 tgt[0]=00000003_1086B210
+  #12 0x3108667C0: tag=0x41 flg=0x310810CD0 tgt[0]=00000003_10866770
+  ... 20 more
+
+--- PASS 3: TYPE TAGS ---
+  0x44E1 : 1 objects
+  0x2C21 : 1 objects
+  0x36E1 : 1 objects
+  0xAC1 : 1 objects
+  0x23 : 1 objects
+  0xB41 : 2 objects
+  0x67 : 7 objects
+  0x201 : 1 objects
+  0x441 : 1 objects
+  0xCF51 : 1 objects
+  0x1261 : 1 objects
+  0x281 : 1 objects
+  0xE1 : 1 objects
+  0x2E1 : 1 objects
+  0x41 : 1 objects
+  0xA1 : 1 objects
+  0x3E1 : 1 objects
+  0x2421 : 1 objects
+  0x3C1 : 1 objects
+  0x2C1 : 1 objects
+  0x221 : 1 objects
+  0x321 : 1 objects
+  0x45A1 : 1 objects
+  0x47 : 2 objects
+
+--- FLAGS ---
+  0x31086D290 : 1 objects
+  0x100000003 : 1 objects
+  0x310867D10 : 1 objects
+  0x310841510 : 1 objects
+  0x1426218B8 : 1 objects
+  0x310865E10 : 1 objects
+  0xF0AFAFAF01000000 : 2 objects
+  0x31081020A : 1 objects
+  0x301000105 : 2 objects
+  0x310853790 : 1 objects
+  0x310842390 : 1 objects
+  0x3105C5710 : 1 objects
+  0x31062B4B0 : 2 objects
+  0x310842450 : 1 objects
+  0x3 : 1 objects
+  0x310823090 : 1 objects
+  0x310863950 : 1 objects
+  0x31086C7D0 : 1 objects
+  0x310857B50 : 1 objects
+  0x3108490B0 : 1 objects
+  0x301000205 : 1 objects
+  0x4020000001000000 : 1 objects
+  0x310810CD0 : 1 objects
+  0x31086010A : 1 objects
+  0x31086B910 : 1 objects
+  0x3107AEA50 : 1 objects
+  0xF0AFAFAF00000000 : 1 objects
+  0x31086B9D0 : 1 objects
+  0x142621838 : 1 objects
+
+--- TARGET [0] VALUES (vtable?) ---
+  00000003_00000004 : 1 objects
+  00000003_108423F0 : 1 objects
+  00000003_10866770 : 1 objects
+  00000000_00000000 : 2 objects
+  40080000_00000000 : 2 objects
+  00000003_1084FCF0 : 1 objects
+  00000003_10864420 : 1 objects
+  00000003_10860100 : 1 objects
+  00000003_107DC400 : 1 objects
+  00000003_108752F0 : 1 objects
+  00000003_10842330 : 1 objects
+  00000003_10825850 : 1 objects
+  00000001_42621948 : 1 objects
+  AFAFAFAF_AFAFAFAF : 4 objects
+  00000003_10847A60 : 1 objects
+  00000003_1085BBE0 : 1 objects
+  00000003_1086C770 : 1 objects
+  00000003_1059FDC0 : 1 objects
+  00000001_42621908 : 1 objects
+  00000003_1059DC30 : 1 objects
+  00000000_70FBBFC0 : 1 objects
+  38324436_38303133 : 1 objects
+  00000003_1086B210 : 1 objects
+  00000003_10632450 : 1 objects
+  00000003_10859750 : 1 objects
+  00000003_1082CDF0 : 1 objects
+  00000001_42621918 : 1 objects
+
+--- PASS 4: DEEP DUMP (object #1) ---
+  container at 0x31087B040:
+    +00: 00000000_00000004
+    +08: 00000003_1087B000
+    +10: 00000001_1A3A4EE0
+    +18: 00000000_0000CF51
+    +20: 40080000_00000000
+    +28: 00000000_00000003
+    +30: 00000003_105CEAE0
+    +38: 00000000_00000004
+    +40: 00000000_00000000
+    +48: 41B062D0_F8000000
+    +50: 00000000_00000003
+    +58: 00000003_105CEB20
+  target at 0x31087B000:
+    +00: 00000001_42621948
+    +08: F1AFAFAF_00000008
+    +10: 00000000_00000040
+    +18: 00000000_00000060
+    +20: 40080000_00000000
+    +28: 00000003_00000003
+    +30: 00000003_105CEAE0 HEAP
+    +38: 00000000_00000004
+    +40: 00000000_00000000
+    +48: 41B0843A_88000000
+    +50: 00000001_00000003
+    +58: 00000003_105CEB20 HEAP
+    +60: 00000003_00000004
+    +68: 00000003_1087B020 HEAP
+    +70: 00000001_1A3A4EE0
+    +78: 00000000_000014E1
+
+--- PASS 5: OBJECT CREATION CORRELATION ---
+  created 3 EVFs: 16901, 518, 519
+  new rc=4 objects after EVF create: 0
+  created 3 sockets
+  new rc=4 after socket create: 0
+
+=== PROBE 41i COMPLETE ===

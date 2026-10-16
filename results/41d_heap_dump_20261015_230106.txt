@@ -1,0 +1,32 @@
+=== PROBE 41d: HEAP DATA DUMP ===
+
+anchor: 0x311720000
+
+--- SECTION 1: FULL BACKWARD SCAN (512 pages x 0x1000) ---
+pages readable : 512
+pages non-zero : 310
+sampled qwords : 2031 non-zero
+
+--- CATEGORIES ---
+  kernel_ptr   : 0
+  heap_self    : 1064
+  heap_other   : 449
+  user_low     : 0
+  small_val    : 59
+  ascii_like   : 19
+  fill_pattern : 440
+
+--- SECTION 2: NO KERNEL POINTERS FOUND ---
+
+--- SECTION 3: NO INTERESTING USER PTRS ---
+
+--- SECTION 4: DENSE PAGE DUMP ---
+  page: 0x311718000
+  +0x00: 00000001_00000001
+  +0x08: FFFFFFFF_00000400 KPTR!
+  +0x10: 00002190_00002190
+  +0x18: 01000100_00000000
+  +0x30: 00000006_80B80007
+  +0x38: 000087F9_F8F65D84
+
+=== PROBE 41d COMPLETE ===

@@ -1,0 +1,74 @@
+=== PROBE 41o: VTABLE REDIRECT ===
+
+anchor: 0x310D4C000
+fake_vt page: 0x310D50000
+
+--- STEP 2: FIND LIVE OBJECT ---
+  no live object found with vtable pattern
+  VICTIM at 0x310D42070, vtable=00000001_D5F10EE0
+  victim dump:
+    +00: 00000001_D5F10EE0 <-- VTABLE DATA
+    +08: 00000000_00001F21
+    +10: 00000003_10D42070 HEAP
+    +18: 00000003_10D42070 HEAP
+    +30: 00000003_10BEA630 HEAP
+    +38: 00000003_00000009 HEAP
+    +50: AFAFAFAF_AFAFAFAF
+    +58: F0AFAFAF_AFAFAFAF
+    +60: 00000001_D5F10EE0 DATA
+    +68: 00000000_00001EC1
+    +70: 00000003_10D420D0 HEAP
+    +78: 00000003_10D420D0 HEAP
+
+--- STEP 3: BUILD FAKE VTABLE ---
+  fake vtable at 0x310D50000:
+    [+00] 00000000_10D4C000
+    [+08] 00000000_10D4C100
+    [+10] 00000000_10D4C200
+    [+18] 00000000_10D4C300
+    [+20] 00000000_10D4C400
+    [+28] 00000000_10D4C500
+    [+30] 00000000_10D4C600
+    [+38] 00000000_10D4C700
+    [+40] 00000000_10D4C800
+    [+48] 00000000_10D4C900
+    [+50] 00000000_10D4CA00
+    [+58] 00000000_10D4CB00
+    [+60] 00000000_10D4CC00
+    [+68] 00000000_10D4CD00
+    [+70] 00000000_10D4CE00
+    [+78] 00000000_10D4CF00
+
+--- STEP 4: REDIRECT VTABLE ---
+  original vtable: 00000001_D5F10EE0
+  new vtable:      00000000_310D50000
+  write ok: true
+  victim +00 now: 00000003_10D50000
+
+--- STEP 5: TRIGGER ATTEMPTS ---
+  baseline vt intact: false
+  after mmap churn: vt_intact=false
+  after pipe churn: vt_intact=false
+  after socket churn: vt_intact=false
+  after EVF churn: vt_intact=false
+  after dynlib walk: vt_intact=false
+  after sigaction: vt_intact=false
+  after extra mmap: vt_intact=false
+  after anchor unmap/remap: vt_intact=false
+
+--- STEP 6: FINAL STATE ---
+  victim +00: 00000003_10D50000
+  vtable still points to our fake (not triggered)
+  restoring original vtable...
+  restored: 00000001_D5F10EE0
+  fake vtable final state:
+    [+00] 00000000_10D4C000
+    [+08] 00000000_10D4C100
+    [+10] 00000000_10D4C200
+    [+18] 00000000_10D4C300
+    [+20] 00000000_10D4C400
+    [+28] 00000000_10D4C500
+    [+30] 00000000_10D4C600
+    [+38] 00000000_10D4C700
+
+=== PROBE 41o COMPLETE ===
