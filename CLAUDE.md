@@ -180,6 +180,20 @@ docs/
 - **sysarch command confusion** — 129 is `SET_FSBASE` (calling with 0 crashes userland). Real `GET_GSBASE` is 130.
 - **/dev/dmem0 physical memory** — GPU aperture only; phys 0 = GPU HW reg `0x80000000_C0012800`, 4GB+ unmapped/zeros.
 - **pipe(42) via make_syscall** — returns fds 0,0 (dead)
+- **AF_ROUTE KASLR (Relapse technique)** — socket opens, zero kernel pointers. Info leak patched on 14.10.
+- **AIO via make_syscall** — sandbox kill is kernel-level. aio_error instant-kills even raw.
+- **kldstat/kldsym via make_syscall** — both sandbox-killed at kernel level.
+- **kinfo_proc kernel pointers** — full 1096B dump: only sentinels, no real kernel pointers.
+- **kern.proc.filedesc/vmmap** — blocked (ret=-1)
+- **sysctl write paths** — all blocked (securelevel, coredump, maxproc)
+- **sysarch GET_GSBASE** — returns 0, no kernel pointer
+- **ioctl via make_syscall** — returns -1 for all tested codes
+- **dup/dup2 via make_syscall** — returns -1
+- **thr_new via make_syscall** — crashes process
+- **kern.msgbuf** — returns only 8 bytes (filtered)
+- **mincore KASLR oracle** — all kernel VA probes return -1
+- **sockopt overflow** — kernel clamps copy length, not exploitable
+- **/dev/hid ioctl** — Sony error 0x80740004 on all codes
 
 ## Sending Probes
 
@@ -196,20 +210,20 @@ python tools/run_session40.py --ps5-ip 10.0.0.96 --fake-ip 10.0.0.250
 
 Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 
-## Current Attack Priority
+## Current Attack Priority (Updated 2026-10-16)
 
-**Send these first (Tier S):**
-1. `43a_kldstat_kaslr.lua` — kernel base address in one call (tests standard syscall 308 and sweep 367)
-2. `43b_kldsym_resolve.lua` — resolve any kernel symbol by name (syscall 337)
-3. `43d_kinfo_proc_full.lua` — full 1096-byte dump of kinfo_proc & filedesc for kernel pointers
-4. `43i_fn_redirect.lua` — test ROP chain fn_addr redirect & slot 0 persistence
+All Phase 10 probes (43a-43p) have been sent. Key results:
 
-**Then (Tier A):**
-5. `43c_sysarch_gsbase.lua` — GS base (sysarch op 130) to leak kernel `curthread` pointer
-6. `43e_blocked_syscall_bypass.lua` — thr_new (455), ioctl (54), fstat, dup via make_syscall
-7. `43f_sysctl_write.lua` — lower securelevel, enable coredump
-8. `43g_sony_syscall_sweep.lua` — sweep 540-700 for unknown live syscalls
-9. `43h_mtypeprotect_wxbypass.lua` — W^X bypass if mtypeprotect changes protections
+**★ CONFIRMED PRIMITIVES:**
+- `fn_addr + slot0 redirect` (43i) — arbitrary function call with 6 args. **Blocker: need kernel address.**
+- `mtypeprotect returns 1 for RWX` (43h/43k) — potential W^X bypass. **Needs execution test.**
+
+**NEXT PROBES TO WRITE:**
+1. **Syscall 557 deep investigation** — returned 16901, unknown function, needs proper arg structures
+2. **mtypeprotect execution test** — write shellcode, call mtypeprotect(RWX), redirect fn_addr to page
+3. **Syscall 620 investigation** — returned 0, unknown function
+4. **TCP input-side attack expansion** — SACK, urgent, MD5/AO, PAWS variants
+5. **IP options from real network** — scapy from PC with malformed options
 
 ## When Analyzing Results
 
