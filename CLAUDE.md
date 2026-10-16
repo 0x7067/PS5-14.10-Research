@@ -16,22 +16,20 @@ Systematic kernel exploit research on PlayStation 5 firmware 14.10. The goal is:
 ### What We Have (Confirmed Working)
 | Primitive | How |
 |-----------|-----|
-| Arbitrary syscall | `make_syscall(N)` — bypasses `syscall.resolve()` sandbox |
+| Arbitrary syscall | `make_syscall(N)` — bypasses `syscall.resolve()` sandbox via C wrapper |
 | Heap R/W (256+ pages) | GPU mmap adjacency, no guard pages |
-| ASLR bypass | `dynlib_get_info(593)` leaks all 39 module bases |
-| Full ROP gadget set | Extracted from eboot (RX, not XO) |
-| ROP chain hijack | `fn_addr` + all arg slots writable from heap |
-| Stack pivot | `pop rsp; ret` at eboot+0x9A2 |
-| **★ W^X bypass** | `sceKernelMtypeprotect(585)` grants RWX on mmap'd pages (probe 44a) |
-| **★ Native code exec** | Write shellcode to RWX page, redirect `fn_addr` → executes (probe 44a) |
-| **★ Arbitrary function call** | `fn_addr` + slot0 writes persist across calls (probe 43i) |
+| ASLR bypass (userland) | `dynlib_get_info(593)` leaks all 39 module bases |
+| Full ROP gadget set | Extracted from eboot (RX, not XO) — but ROP chain is NOT used by make_syscall |
+| Network packet injection | RAW socket + IP_HDRINCL, TCP connect-back with ARP responder |
 
 ### What's Blocked (Hard Walls)
+- **No native code execution** — make_syscall() uses C wrapper, NOT ROP chain. fn_addr is never called. W^X "bypass" was false positive (probe 45c)
+- **W^X enforced** — `mmap(RWX)` gives RW only; `mprotect(EXEC)` always fails; mtypeprotect may change perms but no jump path exists
 - **Execute-only memory (XOM)** — system lib .text is XO (reading crashes); eboot is RX
 - **No threading** — `fork`, `rfork`, `thr_new` all blocked (confirmed via both resolve() and make_syscall)
 - **AIO sandbox-killed** — all `aio_*` terminate instantly (confirmed kernel-level, not resolve()-side)
 - **No kernel pointers in userland** — all info leak paths exhaustively tested and dead
-- **KASLR defeat is the sole remaining blocker** — we have code exec but no kernel address to target
+- **ROP chain is vestigial** — chain + fn_addr + slot0 are metadata only; make_syscall() bypasses them entirely (probe 45c)
 
 ### The Key Insight: `make_syscall()` Bypasses the Sandbox
 The Lua loader's `syscall.resolve()` function has a filter that blocks many syscalls. But `make_syscall(N)` constructs a raw syscall object that goes straight to the kernel. **Sysctl (202) was reported "blocked" by resolve() but works perfectly via make_syscall().** This means every "blocked" verdict from earlier probes needs re-testing.
@@ -183,6 +181,9 @@ docs/
 - **sysarch command confusion** — 129 is `SET_FSBASE` (calling with 0 crashes userland). Real `GET_GSBASE` is 130.
 - **/dev/dmem0 physical memory** — GPU aperture only; phys 0 = GPU HW reg `0x80000000_C0012800`, 4GB+ unmapped/zeros.
 - **pipe(42) via make_syscall** — returns fds 0,0 (dead)
+- **ROP chain hijack / fn_addr redirect** — make_syscall() bypasses ROP chain entirely via C wrapper. fn_addr never called. ud2/null/unmapped = no crash. Chain corruption = no effect (probe 45c)
+- **W^X bypass via mtypeprotect + fn_addr** — false positive. mtypeprotect may change perms but fn_addr never calls the page. No code execution path exists (probes 44a, 45a-c)
+- **Shellcode execution via fn_addr** — all return values = pid regardless of shellcode content. Code is never executed (probes 45a-c)
 - **AF_ROUTE KASLR (Relapse technique)** — socket opens, zero kernel pointers. Info leak patched on 14.10.
 - **AIO via make_syscall** — sandbox kill is kernel-level. aio_error instant-kills even raw.
 - **kldstat/kldsym via make_syscall** — both sandbox-killed at kernel level.
@@ -213,20 +214,22 @@ python tools/run_session40.py --ps5-ip 10.0.0.96 --fake-ip 10.0.0.250
 
 Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 
-## Current Attack Priority (Updated 2026-10-16)
+## Current Attack Priority (Updated 2026-10-16 — post-45c)
 
-All Phase 10 probes (43a-43p) have been sent. Key results:
+**★★★ CRITICAL UPDATE:** Probe 45c proved make_syscall() bypasses the ROP chain entirely. fn_addr, slot0, and the chain are vestigial. The W^X "bypass" was a false positive. We have NO native code execution and NO KASLR defeat.
 
-**★ CONFIRMED PRIMITIVES:**
-- `fn_addr + slot0 redirect` (43i) — arbitrary function call with 6 args. **Blocker: need kernel address.**
-- `mtypeprotect returns 1 for RWX` (43h/43k) — potential W^X bypass. **Needs execution test.**
+**REMAINING PRIMITIVES:**
+- Arbitrary syscall via `make_syscall(N)` (C-level wrapper, confirmed working)
+- Heap R/W via GPU mmap (256+ pages)
+- Userland ASLR bypass via `dynlib_get_info(593)`
+- Network packet injection (RAW socket + IP_HDRINCL, TCP connect-back)
 
 **NEXT PROBES TO WRITE:**
-1. **Syscall 557 deep investigation** — returned 16901, unknown function, needs proper arg structures
-2. **mtypeprotect execution test** — write shellcode, call mtypeprotect(RWX), redirect fn_addr to page
-3. **Syscall 620 investigation** — returned 0, unknown function
-4. **TCP input-side attack expansion** — SACK, urgent, MD5/AO, PAWS variants
-5. **IP options from real network** — scapy from PC with malformed options
+1. **TCP input-side attacks** — SACK processing, urgent pointer, MD5/AO, PAWS (network-side, bypasses syscall sandbox)
+2. **IP options from real network** — scapy from PC with malformed options to PS5 LAN IP
+3. **Sony syscall 557/620 deep investigation** — proper arg structures, output buffers
+4. **Loader internals** — find the C-level syscall dispatch, check for writable function pointers
+5. **SCTP / ip_reass deeper** — untested attack surface in network stack
 
 ## When Analyzing Results
 
