@@ -1,0 +1,45 @@
+=== 38: UNTESTED SYSCALL SWEEP ===
+fw: 14.10
+pid: 493
+
+--- phase 1: resolve check ---
+sc_ktimer_create         235  resolve=ok
+sc_ktimer_settime        236  resolve=ok
+sc_ktimer_gettime        238  resolve=ok
+sc_ktimer_delete         237  resolve=ok
+sc_accept4               541  resolve=ok
+sc_preadv                289  resolve=ok
+sc_pwritev               290  resolve=ok
+sc_copy_file_range       580  resolve=ok
+sc_msync                 226  resolve=ok
+sc_minherit              250  resolve=ok
+sc_cap_rights_limit      533  resolve=ok
+sc_cap_rights_get        515  resolve=ok
+sc_ppoll                 545  resolve=ok
+sc_getrandom             563  resolve=ok
+sc_memfd_create          585  resolve=ok
+sc_posix_fallocate       530  resolve=ok
+sc_fsync                  95  resolve=ok
+sc_ftruncate             480  resolve=ok
+sc_getsockname            32  resolve=ok
+sc_getpeername            31  resolve=ok
+sc_sctp_peeloff          471  resolve=ok
+
+--- phase 2: safe calls (expect EBADF/EINVAL, NOT block) ---
+getrandom(32B): rv=-1
+  bytes: 0000000000000000
+ktimer_create: rv=0
+  timerid out: 0x3
+ktimer_gettime(id=out): rv=0
+accept4(-1): rv=-1
+preadv(-1): rv=-1
+pwritev(-1): rv=-1
+copy_file_range(-1,-1): rv=-1
+cap_rights_get(sock): rv=-1
+cap_rights_limit(sock): rv=-1
+getsockname(sock): rv=0
+  family=2 port=0
+memfd_create: rv=1
+ppoll(nfds=0): rv=-1
+
+--- phase 3: minherit (isolated — crashed in probe 30) ---

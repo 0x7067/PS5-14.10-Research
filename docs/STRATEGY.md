@@ -83,3 +83,27 @@ The PS5 14.10 sandbox eliminates the three most common FreeBSD kernel exploit st
 | TCP_INFO pointer leak | No kernel pointers in 236-byte struct |
 | PS5 custom socket options | Simple boolean toggles, no complex parsing |
 | SNDBUF=1 overflow | Kernel handles correctly, partial writes clean |
+| minherit / msync | **Instant process kill on first call** (probes 38/42b) |
+| memfd_create | Stub — returns fake fd, no real object |
+| getrandom / ppoll / cap_rights | Blocked |
+| ktimer_gettime / ktimer_delete | Blocked (create/settime/getoverrun work — weird split) |
+| 0x1A3A4EE0 "vtable" chase | Unmapped address; 41k-era objects were heap-spray artifacts (41m–41q) |
+| Loopback malformed IP options | ip_output validates lengths before ip_dooptions — need real-network input |
+
+## Live Results Summary (2026-10-15 session)
+
+**Ran:** 36 (ports), 37 (IP options), 38 (syscall sweep), 39 (frags), 41m/41n/41o/41p/41q (vtable chase), 42a (ktimer), 42b (memfd/msync).
+
+**New usable surface:** ktimer create/settime/getoverrun on clocks 0+4. accept4/preadv/pwritev/copy_file_range resolve but need real fds. SCTP socket creation untested.
+
+**New tooling insight:** the crash record (magic 0x13371337) leaks the module code base + heap pointers on every SIGSEGV — a per-process ASLR oracle. Gadgets can be resolved offline from a same-build binary dump.
+
+**Loader behavior:** fresh process + fresh ASLR per connection; heap scanning must be anchor-relative; mapped heap ends in a guard page — always scan DOWN from known-mapped, print progress to survive the 30s socket timeout.
+
+## Next Priorities
+
+1. **Tier 2 TCP connect-back** (probe 40 + tcp_fuzz_server.py) — the biggest untested kernel parser. Needs scapy on the PC.
+2. **IP options from the real network** — PC sends malformed-option packets to the PS5's LAN IP; PS5-side probe just watches a listener. Reaches input-side ip_dooptions without output validation.
+3. **SCTP** — `socket(AF_INET, SOCK_STREAM, 132)` untested; SCTP is a huge parser with a bad CVE history on BSD.
+4. **ip_reass deeper fuzz** — queue exhaustion (send 64+ distinct fragment trains without completing them), reassembly timeout interaction, MF-flag-on-last-fragment, zero-length final fragment.
+5. **ktimer abuse** — arm a timer with SIGEV_SIGNAL + signo for an ignored/blocked signal and observe delivery; settime on one timer while another fires (no threads, but signal handlers are reentrant).

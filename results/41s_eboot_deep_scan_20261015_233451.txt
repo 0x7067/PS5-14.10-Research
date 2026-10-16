@@ -1,0 +1,62 @@
+=== PROBE 41s: DEEP EBOOT GADGET SCAN ===
+
+eboot text: 0x0319CC000 size=0x494000
+
+scanning 0x48000 - 0x494000
+reads: 524288 (2097152 bytes)
+coverage: eboot+0x48000 to +0x248000
+
+=== GADGET RESULTS ===
+
+syscall;ret       : 0
+pop rdi;ret       : 8
+  eboot+0x0C9DFE
+  eboot+0x13149A
+  eboot+0x141FCC
+  eboot+0x14D026
+  eboot+0x14D426
+  eboot+0x14D695
+  eboot+0x15202C
+  eboot+0x22096D
+pop rdx;ret       : 0
+pop rsi;ret       : 3
+  eboot+0x155BE4
+  eboot+0x1870BD
+  eboot+0x18E0F1
+pop rax;ret       : 2
+  eboot+0x14BF59
+  eboot+0x14BF7D
+pop rcx;ret       : 0
+pop r8;ret        : 0
+leave;ret         : 0
+xchg rsp          : 1
+  eboot+0x163874
+jmp rax           : 8
+  eboot+0x054AEC
+  eboot+0x08DFDC
+  eboot+0x08E1F0
+  eboot+0x08E368
+  eboot+0x08E59C
+  eboot+0x08EEE8
+  eboot+0x08F5DC
+  eboot+0x0CDAB4
+int 0x80          : 0
+ret (total)       : 2476
+
+=== VERIFICATION ===
+syscall;ret: NOT FOUND in scanned range
+  need to scan 0x248000 to 0x494000
+pop rdi;ret +0xC9DFE: 5F C3 CONFIRMED
+pop rdx;ret: NOT FOUND in scanned range
+
+=== ROP CHAIN STATUS ===
+  pop rdi;ret    YES (eboot+0xC9DFE)
+  pop rsi;ret    YES (eboot+0x155BE4)
+  pop rdx;ret    MISSING
+  pop rax;ret    YES (eboot+0x14BF59)
+  syscall;ret    MISSING
+  (also from 41r: pop_rsi at +0xD77D, pop_rax at +0x992)
+
+incomplete — need to scan remaining text
+
+=== PROBE 41s COMPLETE ===

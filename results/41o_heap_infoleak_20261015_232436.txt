@@ -1,0 +1,111 @@
+=== PROBE 41o: HEAP INFO LEAK ===
+
+anchor: 0x310B74000
+
+--- SECTION 1: EXHAUSTIVE KPTR SCAN ---
+scanned: 384 pages, 10240 qwords
+kernel pointers found: 0
+
+--- SECTION 2: ALLOC BUFFER LOCATION ---
+marker_buf at: 0x0000000310CD17A0
+marker NOT found in scan range
+
+--- SECTION 3: DYNLIB INFO LEAK ---
+dynlib_get_list: ok ret=0x0
+num_handles: 39
+  handle[0] = 0x0
+  handle[1] = 0x2001
+  handle[2] = 0x2
+  handle[3] = 0x11
+  handle[4] = 0x13
+  handle[5] = 0x14
+  handle[6] = 0x22
+  handle[7] = 0x31
+  get_info(0x0): ok ret=0x0
+    [+08] 69622E74_6F6F6265
+    [+110] 00000005_00494000
+    [+120] 00000003_00180000
+    [+130] 00000001_00018000
+    [+148] A7266D16_00000003
+    [+150] 0183EB6E_C9E4F76F
+    (no text or kernel pointers)
+  get_info(0x2001): ok ret=0x0
+    [+08] 656E7265_6B62696C
+    [+10] 00007872_70732E6C
+    [+108] 00000008_112BC000
+    [+110] 00000004_00048000
+    [+118] 00000008_11304000
+    [+120] 00000001_00020000
+    [+128] 00000008_11324000
+    [+130] 00000001_00004000
+    [+138] 00000008_11328000
+    [+140] 00000003_00038000
+    [+148] 4267EF18_00000004
+    [+150] 96CEEBF5_C2280AF9
+    (no text or kernel pointers)
+  get_info(0x2): ok ret=0x0
+    [+08] 694C6563_5362696C
+    [+10] 6E726574_6E496362
+    [+18] 00787270_732E6C61
+    [+108] 00000008_0D7E4000
+    [+110] 00000004_00128000
+    [+118] 00000008_0D90C000
+    [+120] 00000001_00084000
+    [+128] 00000008_0D990000
+    [+130] 00000001_00008000
+    [+138] 00000008_0D998000
+    [+140] 00000003_00014000
+    [+148] CE3194B2_00000004
+    [+150] 4146210F_3AD6B492
+    (no text or kernel pointers)
+  get_info(0x11): ok ret=0x0
+    [+08] 79536563_5362696C
+    [+10] 2E656C75_646F6D73
+    [+18] 00000000_78727073
+    [+108] 00000008_04E94000
+    [+110] 00000004_0000C000
+    [+118] 00000008_04EA0000
+    [+120] 00000001_00008000
+    [+128] 00000008_04EA8000
+    [+130] 00000001_00004000
+    [+138] 00000008_04EAC000
+    [+140] 00000003_00014000
+    [+148] FE898FAC_00000004
+    [+150] 31759CF9_B8EE0429
+    (no text or kernel pointers)
+
+--- SECTION 4: PIPE BUFFER SCAN ---
+pipe fds: r=0 w=0
+
+--- SECTION 5: SOCKET OPTION LEAK ---
+socket fd: 32
+  SO_TYPE: ret=0x0 len=4 val=0x1 
+  SO_SNDBUF: ret=0x0 len=4 val=0x8000 
+  SO_RCVBUF: ret=0x0 len=4 val=0x10000 
+  SO_ERROR: ret=0x0 len=4 val=0x0 
+  SO_LINGER: ret=0x0 len=4 val=0x0 
+  SO_ACCEPTCONN: ret=0x0 len=4 val=0x0 
+  TCP_NODELAY: ret=0x0 len=4 val=0x0 
+
+--- SECTION 6: POINTER CORRUPTION LEAK ---
+  live object at: 0x310B6D000
+  freed region ends at: 0x310B6C000
+  object dump:
+    [+00] 00000003_10BDADF0 HEAP
+    [+08] 00000000_00000003
+    [+10] 00000001_D5F10EE0 DATA
+    [+18] 00000000_00000001
+    [+20] AFAFAFAF_AFAFAFAF
+    [+28] F0AFAFAF_AFAFAFAF
+    [+30] 00000001_D5F10EE0 DATA
+    [+38] 00000000_000002A1
+    [+40] 00000003_10CF2B90 HEAP
+    [+48] 00000003_10CF2B90 HEAP
+    [+68] 00000000_00000002
+    [+70] 00000001_D5F10EE0 DATA
+    [+78] 00000000_00000001
+  corrupting [+40]: 00000003_10CF2B90
+  restoring original pointer...
+  restored: 00000003_10CF2B90
+
+=== PROBE 41o COMPLETE ===

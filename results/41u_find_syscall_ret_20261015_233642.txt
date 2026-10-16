@@ -1,0 +1,26 @@
+=== PROBE 41u: FIND SYSCALL;RET ===
+
+eboot: 0x07A288000
+
+--- PART 1: EBOOT TAIL 0x448000-0x494000 ---
+syscall;ret in tail: 0
+
+--- PART 2: MODULE DATA SEGMENTS ---
+  no syscall;ret in any data segment
+
+--- PART 3: ALTERNATIVES ---
+bare syscall (0F 05) in eboot first 300KB: 0
+
+=== FINAL ROP CHAIN STATUS ===
+  pop rdi;ret    eboot+0xC9DFE
+  pop rsi;ret    eboot+0xD77D
+  pop rdx;ret    eboot+0x420E6D
+  pop rax;ret    eboot+0x992
+  syscall;ret    MISSING
+  jmp rax        eboot+0x84C
+  xchg rsp       eboot+0x163874
+  leave;ret      eboot+0x37FDE0
+
+syscall;ret not in eboot — need libkernel text or alternative trigger
+
+=== PROBE 41u COMPLETE ===

@@ -1,0 +1,51 @@
+=== 42a: KTIMER DEEP ===
+fw: 14.10
+pid: 500
+
+--- PART 1: clock id sweep ---
+clock  0: rv=0 timerid=3
+clock  1: rv=-1 timerid=0
+clock  2: rv=-1 timerid=0
+clock  3: rv=-1 timerid=0
+clock  4: rv=0 timerid=4
+clock  5: rv=-1 timerid=0
+clock  6: rv=-1 timerid=0
+clock  7: rv=-1 timerid=0
+clock  8: rv=-1 timerid=0
+clock  9: rv=-1 timerid=0
+clock 10: rv=-1 timerid=0
+clock 11: rv=-1 timerid=0
+clock 12: rv=-1 timerid=0
+clock 13: rv=-1 timerid=0
+clock 14: rv=-1 timerid=0
+clock 15: rv=-1 timerid=0
+usable clocks: 2
+
+--- PART 2: itimerspec validation ---
+settime(1s oneshot): rv=0
+gettime: rv=-1
+  remaining: sec=0 nsec=0
+settime(nsec=4G): rv=-1
+settime(nsec=-1): rv=-1
+settime(sec=2^63-1): rv=-1
+disarm: rv=-1
+
+--- PART 3: id abuse ---
+gettime(id=0): rv=-1
+gettime(id=-1): rv=-1
+gettime(id=0x7fffffff): rv=-1
+delete(id=0): rv=-1
+delete(id=-1): rv=-1
+delete(real) #1: rv=-1
+delete(real) #2: rv=-1
+create after delete: rv=0
+  new timerid: 3
+
+--- PART 4: create exhaustion (cap at 64) ---
+stopped at i=28 rv=-1
+timers created: 27
+
+--- PART 5: getoverrun ---
+getoverrun(id=0): rv=-1
+getoverrun(real): rv=0
+=== 42a DONE ===

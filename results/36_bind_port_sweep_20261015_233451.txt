@@ -1,0 +1,62 @@
+=== 36: BIND PORT SWEEP ===
+fw: 14.10
+pid: 493
+
+--- UDP bind sweep (127.0.0.1) ---
+UDP bind port     0: rv=0
+UDP bind port     1: rv=-1
+UDP bind port    53: rv=-1
+UDP bind port    80: rv=-1
+UDP bind port   443: rv=-1
+UDP bind port  1023: rv=-1
+UDP bind port  1024: rv=0
+UDP bind port  5000: rv=0
+UDP bind port  8080: rv=0
+UDP bind port  9026: rv=0
+UDP bind port  9027: rv=0
+UDP bind port 31337: rv=0
+UDP bind port 31338: rv=0
+UDP bind port 31339: rv=0
+UDP bind port 31340: rv=0
+UDP bind port 40000: rv=-1
+UDP bind port 49152: rv=-1
+UDP bind port 50000: rv=-1
+UDP bind port 60000: rv=-1
+UDP bind port 65534: rv=-1
+UDP bind port 65535: rv=-1
+
+--- TCP bind+listen sweep (127.0.0.1) ---
+TCP bind port     0: rv=0 listen=0
+TCP bind port     1: rv=-1 listen=-1
+TCP bind port    53: rv=-1 listen=-1
+TCP bind port    80: rv=-1 listen=-1
+TCP bind port   443: rv=-1 listen=-1
+TCP bind port  1023: rv=-1 listen=-1
+TCP bind port  1024: rv=0 listen=0
+TCP bind port  5000: rv=0 listen=0
+TCP bind port  8080: rv=0 listen=0
+TCP bind port  9026: rv=-1 listen=-1
+TCP bind port  9027: rv=0 listen=0
+TCP bind port 31337: rv=0 listen=0
+TCP bind port 31338: rv=0 listen=0
+TCP bind port 31339: rv=0 listen=0
+TCP bind port 31340: rv=0 listen=0
+TCP bind port 40000: rv=-1 listen=-1
+TCP bind port 49152: rv=-1 listen=-1
+TCP bind port 50000: rv=-1 listen=-1
+TCP bind port 60000: rv=-1 listen=-1
+TCP bind port 65534: rv=-1 listen=-1
+TCP bind port 65535: rv=-1 listen=-1
+
+--- INADDR_ANY comparison ---
+UDP bind 0.0.0.0:31338: rv=0
+UDP bind 0.0.0.0:9027: rv=0
+
+--- SO_REUSEADDR double-bind ---
+first bind: rv=0
+second bind (REUSEADDR): rv=-1
+
+--- SUMMARY ---
+UDP bindable: 0 1024 5000 8080 9026 9027 31337 31338 31339 31340 
+TCP bindable: 0 1024 5000 8080 9027 31337 31338 31339 31340 
+=== 36 DONE ===

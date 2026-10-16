@@ -1,0 +1,6 @@
+=== 41n: REAL HEADER POINTER CHASE ===
+fw: 14.10
+pid: 458
+alloc anchor: 0x310b69bc0
+heap high dword: 0x3
+scanning 0x30fb69bc0 .. 0x311b69bc0 (step 8)

@@ -1,0 +1,9 @@
+=== PROBE 41p: LIBKERNEL GADGET SCAN ===
+
+--- STEP 1: LOCATE LIBKERNEL ---
+loaded modules: 39
+libkernel handle: 0x2001
+text base: 0x00000008149E8000
+text size: 0x400048000
+data base: 0x0000000814A30000
+

@@ -214,3 +214,85 @@ Seven progressively minimal probes confirmed this is a hard sandbox restriction,
 - `writev` with 1025 iovecs → rejected (IOV_MAX=1024)
 
 No buffer overflow at the IOV_MAX boundary. Kernel handles correctly.
+
+---
+
+## Finding 16: Port Bind Policy (probe 36, live)
+
+- Ports **<1024 blocked** (rv=-1), ports **≥40000 blocked**
+- Ports 1024–32767 work: 1024, 5000, 8080, 9027, 31337–31340 all bind (UDP+TCP)
+- TCP 9026 fails (loader owns it); UDP 9026 binds (different protocol slot)
+- INADDR_ANY binds fine; SO_REUSEADDR double-bind correctly rejected
+- **This solves the 35/35b mystery:** nothing was wrong with bind on good ports; the earlier failure was port-selection-related
+
+---
+
+## Finding 17: ip_reass() Handles All Standard Cases Correctly (probe 39, live)
+
+With a working listener on 31338, all fragment cases reassemble correctly:
+- baseline 2-frag, out-of-order, overlap (-8B), tiny-first (8B), dup-final-overwrite, 9×8B chain — **all delivered with correct data**
+- First-fragment-wins on overlap (BSD semantics preserved)
+- proto=47 fragments correctly not delivered to UDP listener
+- **No crash, no corruption.** Basic ip_reass attack surface is well-behaved; deeper fuzzing (timeout expiry, reassembly queue limits, 64+ fragment chains) still untested.
+
+---
+
+## Finding 18: ip_dooptions() Processes Options but Drops Routed Ones (probe 37, live)
+
+- Well-formed RR/TS/NOP: sent and delivered
+- Malformed option lengths (len=0, oversized, truncated): **rejected at send time** (rv=-1) — `ip_output()` validates before `ip_dooptions()` ever runs on loopback. The classic length-confusion cases never reach the parser this way.
+- **LSRR, SSRR, TS-overflow-flag: send OK but NOT delivered** — kernel processes the option and drops/redirects the packet. Source routing is disabled, as expected, but this confirms option-processing code runs.
+- To reach input-side `ip_dooptions()` with malformed lengths, packets must arrive from the **real network** (PC-side scapy), not loopback injection — output-path validation is the gatekeeper.
+
+---
+
+## Finding 19: Crash Record = ASLR Oracle (probes 41m/41o, live)
+
+The crash handler (magic `0x13371337`) emits a ~280-byte binary record on SIGSEGV:
+- `+0x08`: signal number (0x0b = SIGSEGV)
+- `+0x28`: fault address (si_addr)
+- `+0x20/+0x40/+0x58/+0x60/+0x80/+0xD0`: heap pointers (Lua state registers)
+- `+0xB8/+0xF8/+0x100`: **code pointers into the main module**
+- Code base shifted 0x2393xxxx → 0x2558xxxx between runs: **per-process ASLR, but the delta is consistent across all code pointers** — one crash leaks the module base.
+- Heap base `0x3_10000000` region is stable across sessions; only the top frontier moves.
+
+**Strategic value:** any future PC-control primitive (fake vtable etc.) needs gadget addresses. The crash record hands you the module base every time; gadgets can be resolved offline from a dumped copy of the same binary (Relapse can dump on ≤13.60).
+
+---
+
+## Finding 20: The 0x1A3A4EE0 "vtable" is a Session Artifact (probes 41m–41q, live)
+
+- `0x1A3A4EE0` as a raw address is **unmapped** (SIGSEGV, si_addr confirmed 0x1A3A4E00)
+- Full scans of the entire mapped heap `[0x310000000, 0x310DC0000)` plus 4 MB anchor-relative windows: **zero objects with dword 0x1A3A4EE0 exist** in fresh sessions
+- The 41i/41k/41l "objects with vtable header" were artifacts of that session's heap spray (41j AFAF spray) — not naturally occurring loader objects
+- **Do not chase this value without recreating the 41j spray conditions first**
+
+---
+
+## Finding 21: New Syscall Map (probes 38/42a/42b, live)
+
+**Newly confirmed working:**
+- `ktimer_create` (clock 0=REALTIME, 4=MONOTONIC), `ktimer_settime`, `ktimer_getoverrun` — **partially open POSIX timer surface**
+- `getsockname` — works
+- `accept4`, `preadv`, `pwritev`, `copy_file_range` — resolve and error correctly on bad fds (untested on real fds; no usable file fd exists since memfd is stubbed)
+
+**Newly confirmed blocked/stubbed:**
+- `ktimer_gettime`, `ktimer_delete` — blocked even on valid ids (inconsistent with settime being open — odd split)
+- `getrandom` — blocked
+- `ppoll` — blocked
+- `cap_rights_limit/get` — blocked
+- `memfd_create` — stub, returns fake fd=1
+- itimerspec validation is CORRECT (nsec>1e9, negative, huge sec all rejected)
+- Timer cap: 27 concurrent timers
+
+**Newly confirmed DEADLY (instant process kill, no crash record):**
+- `minherit` — kills on first call (this was the probe-29/30 killer)
+- `msync` — kills on first call (the second probe-30 killer, isolated in 42b)
+
+---
+
+## Finding 22: Loader Session Model (live observations)
+
+- pid increments across connections (451→458→472→493→500): the loader respawns a fresh process per TCP connection, **fresh ASLR each probe**
+- Heap anchors shift per session (0x310878000, 0x310bdcfc0, 0x310e05520…) — all heap scanning must be **anchor-relative**, never hardcoded
+- The mapped heap top ends in a guard page (fault at exactly page-aligned 0x310DC0000); scanning UP into the guard kills the process. Scan DOWN from a known-mapped address, or keep progress output flowing to survive the 30s socket timeout.

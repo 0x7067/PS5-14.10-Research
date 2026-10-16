@@ -1,0 +1,29 @@
+=== 37: IP OPTIONS INJECTION ===
+fw: 14.10
+pid: 493
+raw socket: fd=24
+UDP listener bound on 127.0.0.1:31337 fd=25
+
+--- baseline + well-formed options ---
+baseline no options          send rv= 32  delivered=YES (recv=4)
+NOP x4                       send rv= 36  delivered=YES (recv=4)
+RR len7 empty                send rv= 40  delivered=YES (recv=4)
+RR len39 full ptr40          send rv= -1  delivered=no
+TS len8 flags0               send rv= 40  delivered=YES (recv=4)
+TS overflow-flag             send rv= 40  delivered=no
+LSRR loopback                send rv= 40  delivered=no
+SSRR loopback                send rv= 40  delivered=no
+
+--- malformed options (the interesting ones) ---
+RR len=0                     send rv= -1  delivered=no
+RR len39 in 8B space         send rv= -1  delivered=no
+TS len12 truncated           send rv= -1  delivered=no
+RR ptr=250                   send rv= 40  delivered=YES (recv=4)
+RR max header                send rv= -1  delivered=no
+unknown opt 134              send rv= 40  delivered=YES (recv=4)
+EOL then garbage             send rv= 40  delivered=YES (recv=4)
+
+NOTE: if the loader/console dies on any case above, the LAST printed
+tag before silence is the packet class that killed it — retest it
+in isolation. A hang/reboot here = kernel path reached.
+=== 37 DONE ===

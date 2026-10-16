@@ -62,3 +62,12 @@ Every probe sent to the PS5, with status and key result.
 | 34 | `raw_hdrincl` | OK | **RAW socket + IP_HDRINCL WORKS.** Crafted UDP packet reached listener through kernel ip_input(). TCP SYN dropped (bad checksum). bind/connect on raw socket work. |
 | 35 | `frag_fuzz` | FAIL | All 10 fragment tests: no data arrived. Root cause: **listener bind failed** (not fragment-related). |
 | 35b | `frag_isolate` | FAIL | Confirmed: bind() returning -1 is the root cause. Even unfragmented UDP fails when bind fails. Need to investigate port restrictions. |
+| 36 | `bind_port_sweep` | OK | **Port policy mapped: <1024 and ≥40000 blocked; 1024–32767 bind fine.** Solves the 35/35b bind mystery. |
+| 37 | `ip_options` | OK | RR/TS/NOP pass; malformed lens rejected at ip_output (never reach parser); **LSRR/SSRR/TS-overflow sent but dropped on input** — option processing confirmed, need real-network delivery for input-side fuzz. |
+| 38 | `untested_syscalls` | CRASH | **ktimer_create/settime WORK** (timers are live kernel objects!), memfd stub, getrandom/ppoll/cap_rights blocked. Died at **minherit = probe-30 killer identified**. |
+| 39 | `frag_reass` | OK | **ip_reass fully correct on all 7 cases** (baseline, OOO, overlap, tiny-first, dup-final, 9-frag, proto-47). No crash. Deeper fuzz (timeouts, queue limits) still open. |
+| 40 | `tcp_connectback` | READY | Awaits PC-side `tools/tcp_fuzz_server.py` run. |
+| 41m | `vtable_probe` | CRASH | 0x1A3A4EE0 is **unmapped** (SIGSEGV). Crash record format decoded: magic 0x13371337, leaks module code base + heap regs = **ASLR oracle**. |
+| 41n–41q | `header_chase*` | OK | Full heap scans (entire mapped heap + anchor-relative windows): **zero 0x1A3A4EE0 objects in fresh sessions** — 41k-era hits were spray artifacts. Dead end documented. |
+| 42a | `ktimer_deep` | OK | Clocks 0+4 usable; **validation correct** (nsec>1e9/-1/2^63 rejected); gettime/delete blocked while settime works (odd split); cap=27 timers. |
+| 42b | `memfd_msync` | CRASH | memfd returns fake fd=1 (stub). **msync = instant kill** (second probe-30 killer confirmed). |

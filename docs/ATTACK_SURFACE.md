@@ -68,17 +68,31 @@
 ### Untested (Potential Targets)
 | Syscall | Number | Notes |
 |---------|--------|-------|
-| `ktimer_create` | 235 | POSIX timers — kernel objects with complex lifecycle |
-| `ktimer_settime` | 236 | Timer arming |
-| `ktimer_gettime` | 238 | Timer readback |
-| `accept` / `accept4` | 30 / 541 | TCP accept path (listen works) |
-| `preadv` | 289 | Vectored I/O with offset |
-| `pwritev` | 290 | Vectored I/O with offset |
-| `copy_file_range` | 580 | File-to-file kernel copy |
-| `cap_rights_limit` | 533 | Capsicum capabilities |
-| `sctp_*` | various | SCTP protocol |
-| `msync` | 226 | Untested — probe 30 crashed before reaching it |
-| `minherit` | 250 | Never tested |
+| `ktimer_create` | 235 | **WORKS** — clocks 0 (REALTIME) and 4 (MONOTONIC), cap 27 timers |
+| `ktimer_settime` | 236 | **WORKS** — validation correct (bad nsec/sec rejected) |
+| `ktimer_getoverrun` | 239 | **WORKS** |
+| `ktimer_gettime` | 238 | Blocked even on valid ids |
+| `ktimer_delete` | 237 | Blocked even on valid ids |
+| `getrandom` | 563 | Blocked |
+| `ppoll` | 545 | Blocked |
+| `cap_rights_limit/get` | 533/515 | Blocked |
+| `memfd_create` | 585 | Stub — returns fake fd=1 |
+| `minherit` | 250 | **INSTANT KILL** — was the probe-29/30 killer |
+| `msync` | 226 | **INSTANT KILL** — second probe-30 killer |
+| `accept` / `accept4` | 30 / 541 | Resolves, EBADF on bad fd; needs live TCP listener test |
+| `preadv` / `pwritev` | 289/290 | Resolve, EBADF on bad fd; no real file fd available to test |
+| `copy_file_range` | 580 | Resolves, EBADF; untestable without file fds |
+| `getsockname` | 32 | Works |
+| `getpeername` | 31 | Resolves |
+| `sctp_peeloff` | 471 | Resolves (SCTP socket creation untested) |
+
+## Bind Policy (probe 36)
+- Ports <1024: blocked. Ports ≥40000: blocked. 1024–32767: open.
+- Listener port for all future probes: **31337/31338** (confirmed working).
+
+## Network Input Path Status (probes 37/39)
+- `ip_reass()`: all standard fragment cases handled correctly — deeper fuzz (queue exhaustion, timeout, 64+ frags) still open.
+- `ip_dooptions()`: runs on loopback injection (LSRR/SSRR/TS-overflow get processed and dropped), but **malformed option lengths are rejected in ip_output before reaching the parser**. Input-side option fuzzing must come from the real network (PC → PS5 LAN IP), not loopback.
 
 ## Socket Options Accessible
 

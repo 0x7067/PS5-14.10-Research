@@ -1,0 +1,37 @@
+=== PROBE 41t: EBOOT TAIL SCAN ===
+
+eboot text: 0x0319CC000 size=0x494000
+scanning 0x248000 - 0x494000
+reads: 524288 (2097152 bytes)
+coverage: eboot+0x248000 to +0x448000
+
+=== RESULTS ===
+syscall;ret       : 0
+pop rdx;ret       : 1
+  eboot+0x420E6D
+pop rdi;ret       : 0
+pop rsi;ret       : 0
+pop rax;ret       : 0
+leave;ret         : 1
+  eboot+0x37FDE0
+xchg rsp          : 4
+  eboot+0x35330C
+  eboot+0x35397C
+  eboot+0x3601A0
+  eboot+0x370A94
+
+=== VERIFICATION ===
+pop rdx;ret +0x420E6D: 5A C3 CONFIRMED
+
+=== FULL ROP CHAIN (all probes) ===
+  pop rdi;ret    eboot+0xC9DFE (41s)
+  pop rsi;ret    eboot+0xD77D (41r)
+  pop rdx;ret    eboot+0x420E6D (41t)
+  pop rax;ret    eboot+0x992 (41r)
+  syscall;ret    MISSING
+  jmp rax        eboot+0x84C (41r)
+  xchg rsp       eboot+0x163874 (41s)
+
+still missing gadgets — may need to scan data segments or other modules
+
+=== PROBE 41t COMPLETE ===

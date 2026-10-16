@@ -1,0 +1,62 @@
+=== PROBE 41r: EBOOT + DATA GADGET SCAN ===
+
+--- STEP 1: EBOOT INFO ---
+eboot text: 0x0319CC000 size=0x494000
+eboot data: 0x0321CC000
+
+--- STEP 2: EBOOT TEXT READ TEST ---
+EBOOT TEXT IS READABLE: 0x62696C2F
+first 16 bytes: 2F 6C 69 62 65 78 65 63 2F 6C 64 2D 65 6C 66 2E
+
+--- STEP 3: EBOOT GADGET SCAN ---
+scanned: 294912 bytes
+
+GADGET CATALOG:
+  syscall ret     : 0 found
+  pop rdi         : 0 found
+  pop rsi         : 2 found
+    eboot+0x00D77D
+    eboot+0x00DAED
+  pop rdx         : 0 found
+  pop rcx         : 6 found
+    eboot+0x000E64
+    eboot+0x00D446
+    eboot+0x02955A
+    eboot+0x02961D
+    eboot+0x0297C9
+  pop rax         : 4 found
+    eboot+0x000992
+    eboot+0x000C5A
+    eboot+0x01C88D
+    eboot+0x01CBC8
+  pop r8          : 0 found
+  pop rbp         : 418 found
+    eboot+0x000079
+    eboot+0x00016A
+    eboot+0x000245
+    eboot+0x000321
+    eboot+0x000405
+  jmp rax         : 32 found
+    eboot+0x00084C
+    eboot+0x00193C
+    eboot+0x00198C
+    eboot+0x001A59
+    eboot+0x001A69
+  call rax        : 20 found
+    eboot+0x01E01C
+    eboot+0x01E054
+    eboot+0x01E08C
+    eboot+0x01E0C4
+    eboot+0x01E0FC
+  leave ret       : 0 found
+  mov rdi rax     : 0 found
+  xchg rsp        : 0 found
+
+VERIFICATION:
+  pop rax;ret at +0x992: 58 C3 OK
+
+--- STEP 4: LIBKERNEL DATA SCAN ---
+libkernel data at 0x81737C000 sz=0x20000
+  syscall;ret=0 pop_rdi=0 pop_rax=0
+
+=== PROBE 41r COMPLETE ===

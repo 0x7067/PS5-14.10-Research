@@ -1,0 +1,11 @@
+=== 42b: MEMFD + PREADV + MSYNC ===
+fw: 14.10
+pid: 500
+
+--- PART 1: memfd ---
+memfd_create: fd=1
+memfd fd looks fake (<=2) — sandbox stub
+
+--- PART 2: msync isolated ---
+(if loader dies here, msync was the second probe-30 killer)
+region @ 0x31139cee0

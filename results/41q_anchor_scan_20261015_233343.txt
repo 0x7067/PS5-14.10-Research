@@ -1,0 +1,24 @@
+=== 41q: ANCHOR-RELATIVE SCAN ===
+fw: 14.10
+pid: 493
+alloc anchor: 0x310a904a0 (hi=0x3)
+scanning DOWN 0x310a90498 -> 0x3106904a0
+  ... 0x310a50498 (0 hits)
+  ... 0x310a10498 (0 hits)
+  ... 0x3109d0498 (0 hits)
+  ... 0x310990498 (0 hits)
+  ... 0x310950498 (0 hits)
+  ... 0x310910498 (0 hits)
+  ... 0x3108d0498 (0 hits)
+  ... 0x310890498 (0 hits)
+  ... 0x310850498 (0 hits)
+  ... 0x310810498 (0 hits)
+  ... 0x3107d0498 (0 hits)
+  ... 0x310790498 (0 hits)
+  ... 0x310750498 (0 hits)
+  ... 0x310710498 (0 hits)
+  ... 0x3106d0498 (0 hits)
+  ... 0x310690498 (0 hits)
+scan done: 0 hits
+still no hits — objects may live above anchor or in another arena
+=== 41q DONE (no hits) ===

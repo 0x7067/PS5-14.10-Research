@@ -1,0 +1,17 @@
+=== 39: FRAGMENT REASSEMBLY ===
+fw: 14.10
+pid: 493
+listener: 127.0.0.1:31338 fd=23
+
+--- reassembly cases ---
+baseline 2-frag            REASSEMBLED recv=16 data=4142434445464748494a4b4c4d4e4f50
+out-of-order               REASSEMBLED recv=16 data=4142434445464748494a4b4c4d4e4f50
+overlap -8B                REASSEMBLED recv=16 data=4142434445464748494a4b4c4d4e4f50
+tiny-first 8B              REASSEMBLED recv=16 data=4142434445464748494a4b4c4d4e4f50
+dup-final-overwrite        REASSEMBLED recv=16 data=4142434445464748494a4b4c4d4e4f50
+9x 8-byte frags            REASSEMBLED recv=64 data=0102030405060708090a0b0c0d0e0f101112131415161718
+proto=47 frags (expect none) no delivery
+
+NOTE: a queue-size or overlap handling bug here typically shows as a
+hang/reboot mid-case. Last tag printed before silence = suspect case.
+=== 39 DONE ===
