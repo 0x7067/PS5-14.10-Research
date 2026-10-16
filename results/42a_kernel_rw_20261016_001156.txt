@@ -1,0 +1,56 @@
+=== PROBE 42a: KERNEL R/W ===
+
+pid: 528
+
+=== PHASE 1: NORMAL SYSCTL ===
+  kern.version: ret=0 len=44
+    text: r230171/releases/14.10 Sep 28 2026 02:18:33
+    raw qwords:
+      +00: 2F313731_30333272
+      +08: 73657361_656C6572
+      +10: 53203031_2E34312F
+      +18: 30322038_32207065
+      +20: 38313A32_30203632
+      +28: 00000000_0033333A
+  kern.osrelease: ret=0 len=14
+    text: 0.0-prototype
+    raw qwords:
+      +00: 746F7270_2D302E30
+      +08: 00000065_7079746F
+  kern.ostype: ret=0 len=8
+    text: FreeBSD
+    raw qwords:
+      +00: 00445342_65657246
+  hw.machine: ret=0 len=6
+    text: amd64
+    raw qwords:
+      +00: 00000034_36646D61
+  hw.pagesize: ret=0 len=4
+    raw qwords:
+      +00: 00000000_00004000
+  kern.maxproc: ret=-1 len=8
+
+--- KINFO_PROC (kern.proc.pid) ---
+  kern.proc.pid: ret=0 len=1096
+    text: H.
+    *** KERNEL POINTERS FOUND ***
+      +0x060: 0xFFFFFFFF00000000
+  extended kinfo dump (every 8th qword):
+    +000: 00000000_00000448
+    +0C0: 00000000_00000001
+    +100: 00000001_14D10000
+    +140: 00000085_0000035D
+    +180: 00000002_00000000
+    +1C0: 6E69622E_746F6F62
+    +240: 00000080_00000000
+    +280: 00000000_00091364
+    +2C0: 00000000_0000009C
+
+--- VMMAP (kern.proc.vmmap) ---
+  kern.proc.vmmap: ret=-1 len=16384
+
+--- PROC PATHNAME ---
+  kern.proc.pathname: ret=-1 len=1024
+
+=== PHASE 2: OTHER KERNEL SYSCALLS ===
+--- kenv ---
