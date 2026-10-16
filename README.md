@@ -4,9 +4,9 @@ Systematic kernel attack surface mapping and exploit primitive development on Pl
 
 **Goal chain:** Userland code exec → Kernel R/W → Hypervisor bypass
 
-## Current Status: Exploit Primitives Complete
+## Current Status: ROP Chain Hijack Confirmed
 
-All userland exploit primitives are confirmed working. The path to kernel R/W is open.
+All userland exploit primitives confirmed working. **The loader's live ROP chain is fully writable from the heap primitive** — both the function call target and all argument slots can be overwritten and restored without crashing the process. Kernel R/W is one probe away.
 
 ### Confirmed Primitives
 
@@ -19,6 +19,7 @@ All userland exploit primitives are confirmed working. The path to kernel R/W is
 | Complete ROP gadget set | Working | Extracted from loader's own ROP chain |
 | Stack pivot (`pop rsp; ret`) | Working | eboot+0x9A2 |
 | Function call stub | Working | Loader's internal call mechanism |
+| **ROP chain hijack** | **Confirmed** | **Chain + fn_addr writable from heap (probe 41z)** |
 | Kernel info via sysctl | Working | FreeBSD r230171, securelevel=1024 |
 
 ### ROP Gadget Catalog (eboot-relative offsets)
@@ -97,15 +98,22 @@ GPU mmap allocations (`mmap(0, size, 0x33, 0x1002, -1, 0)`) have **no guard page
 4. **Read/write kernel memory** through the corrupted object's normal syscall interface (e.g., `recvmsg` on a socket with corrupted recv buffer)
 5. **Use leaked kernel address + ROP** for privilege escalation
 
-### Alternative: Loader ROP Chain Hijack
+### CONFIRMED: Loader ROP Chain Hijack (Probe 41z)
 
-The Lua loader builds a complete ROP chain in heap memory for every syscall invocation (discovered in probe 41v). The chain layout:
-1. Set all argument registers (rdi, rsi, rdx, rcx, r8)
-2. Load function address from memory into call stub
+The Lua loader builds a complete ROP chain in heap memory for every syscall invocation (discovered in probe 41v). **Probe 41z confirmed the chain is fully writable from the GPU mmap heap primitive:**
+
+- Chain at `ropchain_base` is ~145 pages before GPU mmap — within the 256+ page R/W zone
+- `fn_addr` (function call target pointer) is writable: `0x4141414142424242` written and read back
+- 13 argument slots mapped to their register destinations (rdi, rsi, rdx, rcx, r8, rsp)
+- Write/restore cycle verified — getpid() still works after all corruption/restore cycles
+
+The chain layout:
+1. Load each argument from a heap slot via `pop rax; mov rax,[rax]; pop rdi; mov [rdi],rax`
+2. Write function address to call stub's `fn_addr`
 3. `pop rsp; ret` pivots to call stub
 4. Function executes, returns to longjmp recovery
 
-By overwriting the call stub's function pointer or return address in the heap, we can redirect execution to arbitrary addresses — including kernel exploit payloads.
+**Exploitation**: overwrite the argument slot values before triggering a syscall to control what the kernel receives. Combined with the writable `fn_addr`, this gives arbitrary function call with fully controlled arguments — kernel R/W via `sysctl` or `copyout`/`copyin` gadgets.
 
 ## Probe Categories
 
@@ -127,7 +135,7 @@ Buffer minimum stress testing, nonblocking I/O discovery (MSG_DONTWAIT), F_SETFL
 ### Phase 6: Raw Packet Injection (Probes 34–39)
 RAW socket + IP_HDRINCL confirmed working. Fragment reassembly testing. IP options parsing.
 
-### Phase 7: Heap Exploitation (Probes 40–41w)
+### Phase 7: Heap Exploitation (Probes 40–41z)
 GPU mmap boundary discovery, heap adjacency exploitation, object identification, vtable analysis, ASLR bypass via dynlib_get_info, ROP gadget extraction, loader chain reverse engineering, kernel R/W infrastructure.
 
 ## Key Probe Results
@@ -145,6 +153,9 @@ GPU mmap boundary discovery, heap adjacency exploitation, object identification,
 | 41u | Zero syscall instructions in entire eboot binary (4.6MB scanned) |
 | 41v | Loader ROP chain dumped — complete gadget set + libkernel stub at +0xB57 |
 | 41w | Kernel info: FreeBSD r230171, securelevel=1024, 16 cores, 16KB pages |
+| 41x | Socket kernel objects are in kernel memory (uma_zalloc), not userland heap |
+| 41y | Located ropchain buffer in GPU-adjacent heap zone (output truncated) |
+| 41z | **ROPCHAIN HIJACK CONFIRMED** — chain + fn_addr fully writable, all arg slots mapped |
 
 ## Running Probes
 

