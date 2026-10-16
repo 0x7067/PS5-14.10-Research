@@ -22,13 +22,16 @@ Systematic kernel exploit research on PlayStation 5 firmware 14.10. The goal is:
 | Full ROP gadget set | Extracted from eboot (RX, not XO) |
 | ROP chain hijack | `fn_addr` + all arg slots writable from heap |
 | Stack pivot | `pop rsp; ret` at eboot+0x9A2 |
+| **★ W^X bypass** | `sceKernelMtypeprotect(585)` grants RWX on mmap'd pages (probe 44a) |
+| **★ Native code exec** | Write shellcode to RWX page, redirect `fn_addr` → executes (probe 44a) |
+| **★ Arbitrary function call** | `fn_addr` + slot0 writes persist across calls (probe 43i) |
 
 ### What's Blocked (Hard Walls)
-- **W^X enforced** — `mmap(RWX)` gives RW only; `mprotect(EXEC)` always fails
 - **Execute-only memory (XOM)** — system lib .text is XO (reading crashes); eboot is RX
-- **No threading** — `fork`, `rfork`, `thr_new` all return -1 via `syscall.resolve()` (but UNTESTED via `make_syscall()`)
-- **AIO sandbox-killed** — all `aio_*` terminate the process instantly
-- **No kernel pointers in userland heap** — exhaustive 10,240 qword scan found nothing
+- **No threading** — `fork`, `rfork`, `thr_new` all blocked (confirmed via both resolve() and make_syscall)
+- **AIO sandbox-killed** — all `aio_*` terminate instantly (confirmed kernel-level, not resolve()-side)
+- **No kernel pointers in userland** — all info leak paths exhaustively tested and dead
+- **KASLR defeat is the sole remaining blocker** — we have code exec but no kernel address to target
 
 ### The Key Insight: `make_syscall()` Bypasses the Sandbox
 The Lua loader's `syscall.resolve()` function has a filter that blocks many syscalls. But `make_syscall(N)` constructs a raw syscall object that goes straight to the kernel. **Sysctl (202) was reported "blocked" by resolve() but works perfectly via make_syscall().** This means every "blocked" verdict from earlier probes needs re-testing.
