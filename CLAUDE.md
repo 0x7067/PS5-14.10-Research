@@ -176,16 +176,21 @@ docs/
 - **kenv** — sandbox kill
 - **TCB (FS base)** — userland only (0x88xxxxxxxx)
 - **libkernel data segment scan** — no kernel pointers
-- **kldstat at syscall 306** — WRONG NUMBER, crashed. Correct number is 367.
+- **kldstat at syscall 306** — 306 is `kldfind` (crashed on bad arg). Real FreeBSD `kldstat` is 308; sweep 02 had 367. Probe 43a tests both.
+- **sysarch command confusion** — 129 is `SET_FSBASE` (calling with 0 crashes userland). Real `GET_GSBASE` is 130.
+- **/dev/dmem0 physical memory** — GPU aperture only; phys 0 = GPU HW reg `0x80000000_C0012800`, 4GB+ unmapped/zeros.
 - **pipe(42) via make_syscall** — returns fds 0,0 (dead)
 
 ## Sending Probes
 
 ```bash
-# From the repo root on your PC
+# Via Python (if installed):
 PYTHONIOENCODING=utf-8 python tools/send_probe.py --save probes/<phase>/<name>.lua
 
-# For TCP connect-back fuzzing
+# Via native PowerShell (no Python required):
+.\tools\send_probe.ps1 probes\<phase>\<name>.lua -Save
+
+# For TCP connect-back fuzzing:
 python tools/run_session40.py --ps5-ip 10.0.0.96 --fake-ip 10.0.0.250
 ```
 
@@ -194,14 +199,14 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 ## Current Attack Priority
 
 **Send these first (Tier S):**
-1. `43a_kldstat_kaslr.lua` — kernel base address in one call (correct syscall 367)
-2. `43b_kldsym_resolve.lua` — resolve any kernel symbol by name
-3. `43d_kinfo_proc_full.lua` — full 1096-byte dump for kernel pointers
-4. `43i_fn_redirect.lua` — confirm ROP chain fn_addr redirect works
+1. `43a_kldstat_kaslr.lua` — kernel base address in one call (tests standard syscall 308 and sweep 367)
+2. `43b_kldsym_resolve.lua` — resolve any kernel symbol by name (syscall 337)
+3. `43d_kinfo_proc_full.lua` — full 1096-byte dump of kinfo_proc & filedesc for kernel pointers
+4. `43i_fn_redirect.lua` — test ROP chain fn_addr redirect & slot 0 persistence
 
 **Then (Tier A):**
-5. `43c_sysarch_gsbase.lua` — GS base may leak kernel thread pointer
-6. `43e_blocked_syscall_bypass.lua` — thr_new, ioctl, fstat, dup via make_syscall
+5. `43c_sysarch_gsbase.lua` — GS base (sysarch op 130) to leak kernel `curthread` pointer
+6. `43e_blocked_syscall_bypass.lua` — thr_new (455), ioctl (54), fstat, dup via make_syscall
 7. `43f_sysctl_write.lua` — lower securelevel, enable coredump
 8. `43g_sony_syscall_sweep.lua` — sweep 540-700 for unknown live syscalls
 9. `43h_mtypeprotect_wxbypass.lua` — W^X bypass if mtypeprotect changes protections
