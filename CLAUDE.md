@@ -198,6 +198,8 @@ docs/
 - **mincore KASLR oracle** — all kernel VA probes return -1
 - **sockopt overflow** — kernel clamps copy length, not exploitable
 - **/dev/hid ioctl** — Sony error 0x80740004 on all codes
+- **Syscall 557** — returns formula-based metric (base+ver), base varies per connection. Not exploitable.
+- **Syscall 620** — always returns 0, doesn't modify buffers. No-op.
 
 ## Sending Probes
 
