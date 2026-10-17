@@ -201,6 +201,9 @@ docs/
 - **Syscall 557** — returns formula-based metric (base+ver), base varies per connection. Not exploitable.
 - **Syscall 620** — always returns 0, doesn't modify buffers. No-op.
 - **CClosure C function pointer redirect** — CClosure +0 (C func ptr) is READ-ONLY. Upvalues (+16-48) writable but don't control dispatch. All metatable functions same. (probe 47b)
+- **TCP state machine injection** — 182 crafted segments into ESTABLISHED loopback connection (RST, SACK, PAWS, option parser len=0/255, URG, zero-window, ACK storm, SYN flood). Zero crashes. TCP_INFO seq numbers leak at +108/+112 but TCP processing is hardened. (probe 49a)
+- **IPv6 fragment reassembly attacks** — 280 fragments targeting ip6_reass() (overlapping/teardrop, queue exhaustion 50+101-bomb, huge totals 65535+, atomic frags, interleaving, ext hdr combos, nested frag-in-frag). Zero crashes. RFC 5722 correctly implemented. (probe 49b)
+- **Port binding ≥40000** — bind() returns -1 for ports ≥40000. Use 1024-32767 range.
 
 ## Sending Probes
 
