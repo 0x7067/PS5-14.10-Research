@@ -200,6 +200,7 @@ docs/
 - **/dev/hid ioctl** — Sony error 0x80740004 on all codes
 - **Syscall 557** — returns formula-based metric (base+ver), base varies per connection. Not exploitable.
 - **Syscall 620** — always returns 0, doesn't modify buffers. No-op.
+- **CClosure C function pointer redirect** — CClosure +0 (C func ptr) is READ-ONLY. Upvalues (+16-48) writable but don't control dispatch. All metatable functions same. (probe 47b)
 
 ## Sending Probes
 
