@@ -217,22 +217,28 @@ python tools/run_session40.py --ps5-ip 10.0.0.96 --fake-ip 10.0.0.250
 
 Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 
-## Current Attack Priority (Updated 2026-10-16 — post-45c)
+## Current Attack Priority (Updated 2026-10-16 — post-48a)
 
-**★★★ CRITICAL UPDATE:** Probe 45c proved make_syscall() bypasses the ROP chain entirely. fn_addr, slot0, and the chain are vestigial. The W^X "bypass" was a false positive. We have NO native code execution and NO KASLR defeat.
+**★★★ CRITICAL UPDATE:** Probe 45c proved make_syscall() bypasses the ROP chain entirely. fn_addr, slot0, and the chain are vestigial. The W^X "bypass" was a false positive. We have NO native code execution and NO KASLR defeat. Probe 47b confirmed CClosure C func ptr is read-only — all internal code redirect paths are dead.
+
+**★★ NEW: Probe 48a discovered massive network attack surface** — SCTP raw socket open, IPv6 fully available (TCP/UDP/RAW/ICMPv6), 143 raw IPv4 protocols, 17 IPv6 raw protocols. Network-side attacks are now the primary exploit path.
 
 **REMAINING PRIMITIVES:**
 - Arbitrary syscall via `make_syscall(N)` (C-level wrapper, confirmed working)
 - Heap R/W via GPU mmap (256+ pages)
 - Userland ASLR bypass via `dynlib_get_info(593)`
 - Network packet injection (RAW socket + IP_HDRINCL, TCP connect-back)
+- **SCTP raw socket** (proto 132) — new, untested kernel code path
+- **Full IPv6 stack** — TCP/UDP/RAW/ICMPv6 all open
+- **143 raw IPv4 protocols** — each hits a kernel input handler
 
 **NEXT PROBES TO WRITE:**
-1. **TCP input-side attacks** — SACK processing, urgent pointer, MD5/AO, PAWS (network-side, bypasses syscall sandbox)
-2. **IP options from real network** — scapy from PC with malformed options to PS5 LAN IP
-3. **Sony syscall 557/620 deep investigation** — proper arg structures, output buffers
-4. **Loader internals** — find the C-level syscall dispatch, check for writable function pointers
-5. **SCTP / ip_reass deeper** — untested attack surface in network stack
+1. **SCTP chunk fuzzing** — INIT, COOKIE-ECHO, DATA, SACK, HEARTBEAT from PC → PS5 (largest untested kernel surface)
+2. **IPv6 NDP attacks** — Router Advertisement, Neighbor Solicitation/Advertisement spoofing from PC
+3. **IPv6 fragment reassembly** — overlapping fragments, tiny fragments, extension header chains
+4. **TCP input-side attacks** — SACK processing, urgent pointer, MD5/AO, PAWS (network-side)
+5. **IP options from real network** — coordinated PC+PS5 test (46c listener + ip_fragment_inject.py)
+6. **Exotic protocol handlers** — GRE, ESP, AH, IGMP, PIM packets from PC
 
 ## When Analyzing Results
 
