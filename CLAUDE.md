@@ -150,6 +150,8 @@ probes/
   phase8_live_network/       # 40tcp, 42: TCP fuzz, ktimer, live testing
   phase9_kaslr_defeat/       # 42b-42j: KASLR attempts (mostly failed)
   phase10_untested_theories/ # 43a+: theory-driven probes (READY TO SEND)
+  phase11_network_attacks/   # 48a-50d: SCTP, IPv6, TCP inject, exotic protocols
+  phase12_kernel_analysis/   # 51a+: kernel dump sysent analysis, Sony syscall survey
 results/                     # Output logs (same phase structure)
 tools/                       # send_probe.py, run_session40.py, tcp_fuzz_server.py
 docs/
@@ -201,6 +203,12 @@ docs/
 - **Syscall 557** — returns formula-based metric (base+ver), base varies per connection. Not exploitable.
 - **Syscall 620** — always returns 0, doesn't modify buffers. No-op.
 - **CClosure C function pointer redirect** — CClosure +0 (C func ptr) is READ-ONLY. Upvalues (+16-48) writable but don't control dispatch. All metatable functions same. (probe 47b)
+- **SCTP chunk fuzzing** — 39 variants via loopback raw socket, zero crashes (probe 48b)
+- **IPv6 extension header fuzzing** — 83 variants, zero crashes (probe 48c)
+- **TCP state machine injection** — 182 crafted segments, zero crashes. RFC 5961 challenge ACK confirmed. (probe 49a)
+- **IPv6 fragment reassembly** — 280 fragments, zero crashes. RFC 5722 implemented. (probe 49b)
+- **Exotic protocols (IGMP/GRE/ESP/AH/PIM/OSPF/VRRP)** — 86 packets, zero crashes (probe 50a)
+- **Sony syscall info leak** — 11 accessible syscalls deep-tested with output buffers, no kernel pointers in any output (probes 51a, 51b)
 - **TCP state machine injection** — 182 crafted segments into ESTABLISHED loopback connection (RST, SACK, PAWS, option parser len=0/255, URG, zero-window, ACK storm, SYN flood). Zero crashes. TCP_INFO seq numbers leak at +108/+112 but TCP processing is hardened. (probe 49a)
 - **IPv6 fragment reassembly attacks** — 280 fragments targeting ip6_reass() (overlapping/teardrop, queue exhaustion 50+101-bomb, huge totals 65535+, atomic frags, interleaving, ext hdr combos, nested frag-in-frag). Zero crashes. RFC 5722 correctly implemented. (probe 49b)
 - **Port binding ≥40000** — bind() returns -1 for ports ≥40000. Use 1024-32767 range.
@@ -220,28 +228,29 @@ python tools/run_session40.py --ps5-ip 10.0.0.96 --fake-ip 10.0.0.250
 
 Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 
-## Current Attack Priority (Updated 2026-10-16 — post-48a)
+## Current Attack Priority (Updated 2026-10-17 — post-51b)
 
 **★★★ CRITICAL UPDATE:** Probe 45c proved make_syscall() bypasses the ROP chain entirely. fn_addr, slot0, and the chain are vestigial. The W^X "bypass" was a false positive. We have NO native code execution and NO KASLR defeat. Probe 47b confirmed CClosure C func ptr is read-only — all internal code redirect paths are dead.
 
-**★★ NEW: Probe 48a discovered massive network attack surface** — SCTP raw socket open, IPv6 fully available (TCP/UDP/RAW/ICMPv6), 143 raw IPv4 protocols, 17 IPv6 raw protocols. Network-side attacks are now the primary exploit path.
+**★★ Network fuzzing hit a wall:** 700+ malformed packets across TCP/IPv6/SCTP/IGMP/GRE/ESP/AH/PIM/OSPF/VRRP — zero kernel crashes. Network stack is well-hardened.
+
+**★★ Sony syscall survey (51a+51b):** 11 accessible Sony syscalls mapped. No kernel pointer leaks. Syscall 624 is a live VM counter (changes between connections). Second half of range (627-676) untested.
 
 **REMAINING PRIMITIVES:**
 - Arbitrary syscall via `make_syscall(N)` (C-level wrapper, confirmed working)
 - Heap R/W via GPU mmap (256+ pages)
 - Userland ASLR bypass via `dynlib_get_info(593)`
 - Network packet injection (RAW socket + IP_HDRINCL, TCP connect-back)
-- **SCTP raw socket** (proto 132) — new, untested kernel code path
-- **Full IPv6 stack** — TCP/UDP/RAW/ICMPv6 all open
-- **143 raw IPv4 protocols** — each hits a kernel input handler
+- **11 accessible Sony syscalls** — 596, 585, 572, 624, 563-566, 606, 643, 640
+- **Syscall 624 live counter** — VM metric that changes per-connection (potential side-channel)
 
 **NEXT PROBES TO WRITE:**
-1. **SCTP chunk fuzzing** — INIT, COOKIE-ECHO, DATA, SACK, HEARTBEAT from PC → PS5 (largest untested kernel surface)
-2. **IPv6 NDP attacks** — Router Advertisement, Neighbor Solicitation/Advertisement spoofing from PC
-3. **IPv6 fragment reassembly** — overlapping fragments, tiny fragments, extension header chains
-4. **TCP input-side attacks** — SACK processing, urgent pointer, MD5/AO, PAWS (network-side)
-5. **IP options from real network** — coordinated PC+PS5 test (46c listener + ip_fragment_inject.py)
-6. **Exotic protocol handlers** — GRE, ESP, AH, IGMP, PIM packets from PC
+1. **Complete Sony syscall survey** — syscalls 627-676 untested (51a output truncated)
+2. **Syscall 624 as heap oracle** — call in loop, correlate with allocations, measure sensitivity
+3. **Syscalls 606/643 with event structures** — may be evdev/notification syscalls needing proper args
+4. **Syscall 640 with varied arg patterns** — returns 0 but buffer empty, try different structures
+5. **PC-coordinated network attacks** — real network packets from external host (not loopback)
+6. **Loader internals** — find the C-level syscall dispatch, check for writable function pointers
 
 ## When Analyzing Results
 
