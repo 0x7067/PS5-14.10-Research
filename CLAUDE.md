@@ -12,8 +12,9 @@ This section supersedes older, more confident statements that remain in the hist
 
 - Probe 45c recorded sysctl/getpid results persisting after selected fn_addr changes and corruption of chain entries 0–7 in one run. This contradicts the earlier dependency model for those tested calls; it does not identify the complete dispatch implementation or establish that every path ignores those fields.
 - Probe 46b reports a shared C-function __call address, but its log is truncated and does not establish the function's implementation or a redirection primitive.
+- Probes 54o and 54p are incomplete: 54o stops immediately after writing the candidate `+0x20` field, while 54p stops after printing the `xor eax,eax;ret` gadget address. The captures contain no post-call marker, restore confirmation, or returned Lua value. A timeout/reset is a transport outcome and does not establish native code execution.
 - Native code execution, a 14.10 kernel vulnerability, kernel read/write, and KASLR defeat are not demonstrated.
-- Probes 43o, 43p, 43a/43b, and 47b have evidence gaps. Retests 53a–53d are prepared but unrun. Scripts 52a/52b have no saved outputs.
+- Probes 43o, 43p, 43a/43b, and 47b have evidence gaps. Retest 53d established qword writability/restoration across the tested CClosure offsets; 54o/54p remain incomplete redirect experiments. Scripts 52a/52b have no saved outputs.
 - The captures labeled 13.60 are fixed ranges, not complete kernel sections; acquisition authenticity remains unresolved; no verified 14.10 kernel image is present in this repository.
 
 
@@ -21,7 +22,7 @@ This section supersedes older, more confident statements that remain in the hist
 - **Target:** PS5 at YOUR_PS5_IP:9026, firmware 14.10
 - **Kernel:** FreeBSD r230171 (Sep 28 2026), 16KB pages
 - **Entry:** Lua 5.1 scripts sent over TCP (8-byte LE length prefix + raw source)
-- **Tool:** `python tools/send_probe.py --save probes/<path>.lua`
+- **Tool:** `python tools/send_probe.py --save probes/<path>.lua` (writes a JSON run record; `tools/run_probe_batch.py` provides bounded sequential execution)
 - **Per-connection ASLR:** Fresh process spawns for every TCP connection. All addresses must be re-derived each run.
 
 ### What We Have (Confirmed Working)
@@ -218,7 +219,7 @@ docs/
 - **/dev/hid ioctl** — Sony error 0x80740004 on all codes
 - **Syscall 557** — saved 46a/47a tests show argument-dependent returns, including a linear version pattern for tested positive versions in 47a and a special version-zero result. No kernel pointer or exploit was demonstrated; full semantics and exploitability remain unresolved.
 - **Syscall 620** — the saved 46a re-run returns 0 for its tested inputs; sentinel checks report no changes in their monitored windows. The zero-struct dump used the same incorrect baseline as 557 and is not write evidence. Full semantics remain unresolved; see `docs/SYSCALL_557_14_10_EVIDENCE.md`.
-- **CClosure C function pointer redirect** — retest 53d confirmed ALL 7 offsets (+0x00 through +0x30) are WRITABLE with successful restore. +0x30 holds a C function pointer at 0x00000001_52D10EE0 (eboot range). Write primitive confirmed; execution redirect NOT yet tested. (probe 53d retest 2026-10-18). **Probe 54l written to test full exploit chain: sys 588 RWX + shellcode + CClosure redirect.**
+- **CClosure C function pointer redirect** — retest 53d confirmed ALL 7 offsets (+0x00 through +0x30) are writable with successful restore. +0x30 was observed holding an eboot-range pointer, but the field consumed by dispatch is unresolved. Probes 54o/54p tested a `+0x20` candidate and stopped before a returned value or restore marker; no execution redirect is established.
 - **SCTP chunk fuzzing** — 39 variants via loopback raw socket, zero crashes (probe 48b)
 - **IPv6 extension header fuzzing** — 83 variants, zero crashes (probe 48c)
 - **TCP state machine injection** — 182 crafted segments; the saved run reached COMPLETE. RST injection left the observed state ESTABLISHED, which does not by itself confirm RFC 5961 challenge ACK behavior. (probe 49a)
@@ -270,7 +271,7 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - Network packet injection (RAW socket + IP_HDRINCL, TCP connect-back)
 - **11 accessible Sony syscalls** — 596, 585, 572, 624, 563-566, 606, 643, 640
 - **Syscall 624 observation** — values differ by one across two saved processes; no controlled VM-map test result exists to establish a live counter or side channel
-- **★★★ sys 588 + CClosure +0x30 exploit chain (UNTESTED)** — sys 588 returned ret=0 when setting prot=7 (RWX) on GPU mmap pages (probe 54d). CClosure +0x30 is a writable C function pointer in eboot range (probe 53d). Probe 54l tests: write shellcode to GPU page → sys 588 set RWX → CClosure +0x30 redirect → native code execution. **This is the highest priority test.**
+- **CClosure redirect characterization (INCOMPLETE)** — sys 588 returned ret=0 when setting prot=7 on GPU mmap pages (probe 54d), and 53d confirmed qword writability across offsets. The 54o/54p captures do not establish which field dispatch consumes or native code execution. Treat the older 54l chain as an unverified hypothesis until the call/return behavior is characterized.
 
 **2026-10-18 results:** Probes 54b (sys 629), 54c (AIO 661), 54f (8-section KASLR), 54k (sys 649 deep + RDMSR) all returned no kernel pointers. AIO is confirmed lethal. RDMSR (626/567) blocked. Jail bypass (629) blocked. sys 649 returns userland module addresses only (members 1-4, 7, 8).
 
