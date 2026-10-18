@@ -14,7 +14,7 @@ This section supersedes older, more confident statements that remain in the hist
 - Probe 46b reports a shared C-function __call address, but its log is truncated and does not establish the function's implementation or a redirection primitive.
 - Native code execution, a 14.10 kernel vulnerability, kernel read/write, and KASLR defeat are not demonstrated.
 - Probes 43o, 43p, 43a/43b, and 47b have evidence gaps. Retests 53a–53d are prepared but unrun. Scripts 52a/52b have no saved outputs.
-- The 13.60 captures are fixed ranges, not complete kernel sections; no verified 14.10 kernel image is present in this repository.
+- The captures labeled 13.60 are fixed ranges, not complete kernel sections; acquisition authenticity remains unresolved; no verified 14.10 kernel image is present in this repository.
 
 
 ### The Environment
@@ -201,12 +201,12 @@ docs/
 - **ROP chain hijack / fn_addr redirect** — 45c observed tested calls returning normally after selected metadata mutations; no arbitrary function-call primitive is established and the full dispatch path is unknown
 - **W^X bypass via mtypeprotect + fn_addr** — earlier code-execution claim is unsupported; mtypeprotect returns did not prove code-page execution, and 45c undermines the proposed dependency for tested calls
 - **Shellcode execution via fn_addr** — proposed writes did not land and results do not establish shellcode execution; the evidence does not prove every path is incapable of executing code
-- **AF_ROUTE KASLR (Relapse technique)** — inconclusive: 43o's RTM_GET write returned -1 (message never delivered); the 108-byte read was an echo of our own request. The leak was never validly tested (retest 53b pending; 2026-10-17 audit).
+- **AF_ROUTE KASLR (Relapse technique)** — inconclusive: 43o logged RTM_GET write ret=-1, a 108-byte read and zero detected kernel pointers; the read's origin is unresolved. Successful request delivery and a valid disclosure test are not established (retest 53b pending; 2026-10-17 audit).
 - **AIO via make_syscall** — inconclusive (see above). "Instant kill" is not established (retest 53a pending; 2026-10-17 audit).
 - **kldstat/kldsym via make_syscall** — inconclusive: 43a/43b logs are header-only (145 B / 116 B), no output and no kill record (retest 53c pending; 2026-10-17 audit).
 - **kinfo_proc kernel pointers** — full 1096B dump: only sentinels, no real kernel pointers.
 - **kern.proc.filedesc/vmmap** — blocked (ret=-1)
-- **sysctl write paths** — all blocked (securelevel, coredump, maxproc)
+- **sysctl operations (43f)** — the write labeled `kern.securelevel` returned -1. Reads labeled `kern.coredump`, `security.bsd.unprivileged_proc_debug` and `kern.maxproc` returned -1, so their conditional writes were not reached. `kern.somaxconn` read returned 0/value 1024; no write was attempted. See `results/43f_sysctl_write_20261016_180756.txt`; these labels follow the probe's assumed MIB mappings.
 - **sysarch GET_GSBASE** — returns 0, no kernel pointer
 - **ioctl via make_syscall** — returns -1 for all tested codes
 - **dup/dup2 via make_syscall** — returns -1
@@ -220,12 +220,12 @@ docs/
 - **CClosure C function pointer redirect** — unverified: 47b never write-tested +0 (its loop covered {16,24,32,40,48}); its log contradicts itself at +0 ("C FUNCTION CANDIDATE" vs heap values) (retest 53d pending; 2026-10-17 audit).
 - **SCTP chunk fuzzing** — 39 variants via loopback raw socket, zero crashes (probe 48b)
 - **IPv6 extension header fuzzing** — 83 variants, zero crashes (probe 48c)
-- **TCP state machine injection** — 182 crafted segments, zero crashes. RFC 5961 challenge ACK confirmed. (probe 49a)
-- **IPv6 fragment reassembly** — 280 fragments, zero crashes. RFC 5722 implemented. (probe 49b)
+- **TCP state machine injection** — 182 crafted segments; the saved run reached COMPLETE. RST injection left the observed state ESTABLISHED, which does not by itself confirm RFC 5961 challenge ACK behavior. (probe 49a)
+- **IPv6 fragment reassembly** — 280 fragments; the saved run reached COMPLETE. This does not establish RFC 5722 compliance. (probe 49b)
 - **Exotic protocols (IGMP/GRE/ESP/AH/PIM/OSPF/VRRP)** — 86 packets, zero crashes (probe 50a)
 - **Sony syscall info leak** — 11 accessible syscalls deep-tested with output buffers, no kernel pointers in any output (probes 51a, 51b)
-- **TCP state machine injection** — 182 crafted segments into ESTABLISHED loopback connection (RST, SACK, PAWS, option parser len=0/255, URG, zero-window, ACK storm, SYN flood). Zero crashes. TCP_INFO seq numbers leak at +108/+112 but TCP processing is hardened. (probe 49a)
-- **IPv6 fragment reassembly attacks** — 280 fragments targeting ip6_reass() (overlapping/teardrop, queue exhaustion 50+101-bomb, huge totals 65535+, atomic frags, interleaving, ext hdr combos, nested frag-in-frag). Zero crashes. RFC 5722 correctly implemented. (probe 49b)
+- **TCP state machine injection** — 182 crafted segments into ESTABLISHED loopback connection (RST, SACK, PAWS, option parser len=0/255, URG, zero-window, ACK storm, SYN flood). The saved run reached COMPLETE. TCP_INFO values at +108/+112 tracked sequence numbers in that run; this does not establish TCP hardening or RFC compliance. (probe 49a)
+- **IPv6 fragment reassembly attacks** — 280 fragments targeting ip6_reass() (overlapping/teardrop, queue exhaustion 50+101-bomb, huge totals 65535+, atomic frags, interleaving, ext hdr combos, nested frag-in-frag). The saved run reached COMPLETE; fragment-drop behavior and RFC 5722 compliance were not independently established. (probe 49b)
 - **Port binding ≥40000** — bind() returns -1 for ports ≥40000. Use 1024-32767 range.
 
 ## Sending Probes
@@ -247,7 +247,7 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 
 **Evidence update:** Probe 45c found tested sysctl/getpid results persisted with selected fn_addr values and chain-entry corruption. This undermines the prior execution model for those calls but does not identify the loader's complete dispatch implementation. Native execution and KASLR defeat remain unestablished. Probe 47b's offset +0 question is unresolved; retest 53d is pending.
 
-**★★ Network fuzzing hit a wall:** 700+ malformed packets across TCP/IPv6/SCTP/IGMP/GRE/ESP/AH/PIM/OSPF/VRRP — zero kernel crashes. Network stack is well-hardened.
+**Recorded network tests:** Saved logs for 48b (39 SCTP variants), 48c (83 IPv6 variants), 49a (182 TCP segments), 49b (280 IPv6 fragments) and 50a (86 exotic-protocol packets) reached COMPLETE. These runs show continued probe output after the listed sends, not independently verified handler coverage, general network hardening or absence of vulnerabilities. See the matching `results/48b_*`, `48c_*`, `49a_*205919.txt`, `49b_*` and `50a_*` logs.
 
 **★★ Sony syscall observations (51a+51b):** 11 syscalls returned non-error values for the tested arguments. No kernel pointer leak was established in those outputs. Syscall 624 differed by one across two processes; this does not establish a live counter. Scripts 52a/52b have no saved results.
 
