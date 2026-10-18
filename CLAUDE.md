@@ -40,7 +40,7 @@ This section supersedes older, more confident statements that remain in the hist
 - **Execute-only memory (XOM)** — system lib .text is XO (reading crashes); eboot is RX
 - **No threading** — `fork`, `rfork`, `thr_new` all blocked (confirmed via both resolve() and make_syscall)
 - **AIO 661-670 — confirmed hard wall** — sys 661 instantly kills the process on 14.10. Tested via probes 54c and 54f section G (2026-10-18). The earlier 43p inconclusive status is resolved: AIO event syscalls are lethal.
-- **No kernel pointers found (as of last valid tests)** — extensive scanning has found none; the AF_ROUTE (43o) and kldstat/kldsym (43a/43b) paths were not validly tested — retests 53b/53c pending (2026-10-17 audit)
+- **No kernel pointers found** — extensive scanning has found none. AF_ROUTE retest 53b confirmed kernel sanitizes route messages (zero kernel pointers). kldstat/kldsym (43a/43b) retest 53c never ran (connection refused). No KASLR defeat path identified.
 - **ROP-shaped metadata role is unknown** — tested calls persisted after selected fn_addr and chain mutations; do not treat the fields as a function-call primitive
 
 ### Tested raw syscall behavior
@@ -202,7 +202,7 @@ docs/
 - **ROP chain hijack / fn_addr redirect** — 45c observed tested calls returning normally after selected metadata mutations; no arbitrary function-call primitive is established and the full dispatch path is unknown
 - **W^X bypass via mtypeprotect + fn_addr** — earlier code-execution claim is unsupported; mtypeprotect returns did not prove code-page execution, and 45c undermines the proposed dependency for tested calls
 - **Shellcode execution via fn_addr** — proposed writes did not land and results do not establish shellcode execution; the evidence does not prove every path is incapable of executing code
-- **AF_ROUTE KASLR (Relapse technique)** — inconclusive: 43o logged RTM_GET write ret=-1, a 108-byte read and zero detected kernel pointers; the read's origin is unresolved. Successful request delivery and a valid disclosure test are not established (retest 53b pending; 2026-10-17 audit).
+- **AF_ROUTE KASLR (Relapse technique)** — **CONFIRMED DEAD**: retest 53b delivered RTM_GET (hdr=152, write ret=168), received valid 136-byte response (version=5, type=4, pid=112), but all payload is zeroed sockaddr structures — zero kernel pointers. Kernel sanitizes route messages on 14.10. (probes 43o, 53b retest 2026-10-18)
 - **AIO via make_syscall** — **CONFIRMED**: sys 661 instantly kills process. "Instant kill" IS established (probes 54c/54f, 2026-10-18).
 - **kldstat/kldsym via make_syscall** — inconclusive: 43a/43b logs are header-only (145 B / 116 B), no output and no kill record (retest 53c pending; 2026-10-17 audit).
 - **kinfo_proc kernel pointers** — full 1096B dump: only sentinels, no real kernel pointers.
@@ -218,7 +218,7 @@ docs/
 - **/dev/hid ioctl** — Sony error 0x80740004 on all codes
 - **Syscall 557** — saved 46a/47a tests show argument-dependent returns, including a linear version pattern for tested positive versions in 47a and a special version-zero result. No kernel pointer or exploit was demonstrated; full semantics and exploitability remain unresolved.
 - **Syscall 620** — always returns 0, doesn't modify buffers. No-op.
-- **CClosure C function pointer redirect** — unverified: 47b never write-tested +0 (its loop covered {16,24,32,40,48}); its log contradicts itself at +0 ("C FUNCTION CANDIDATE" vs heap values) (retest 53d pending; 2026-10-17 audit).
+- **CClosure C function pointer redirect** — retest 53d confirmed ALL 7 offsets (+0x00 through +0x30) are WRITABLE with successful restore. +0x30 holds a C function pointer at 0x00000001_52D10EE0 (eboot range). Write primitive confirmed; execution redirect NOT yet tested. (probe 53d retest 2026-10-18). **Probe 54l written to test full exploit chain: sys 588 RWX + shellcode + CClosure redirect.**
 - **SCTP chunk fuzzing** — 39 variants via loopback raw socket, zero crashes (probe 48b)
 - **IPv6 extension header fuzzing** — 83 variants, zero crashes (probe 48c)
 - **TCP state machine injection** — 182 crafted segments; the saved run reached COMPLETE. RST injection left the observed state ESTABLISHED, which does not by itself confirm RFC 5961 challenge ACK behavior. (probe 49a)
@@ -228,6 +228,8 @@ docs/
 - **TCP state machine injection** — 182 crafted segments into ESTABLISHED loopback connection (RST, SACK, PAWS, option parser len=0/255, URG, zero-window, ACK storm, SYN flood). The saved run reached COMPLETE. TCP_INFO values at +108/+112 tracked sequence numbers in that run; this does not establish TCP hardening or RFC compliance. (probe 49a)
 - **IPv6 fragment reassembly attacks** — 280 fragments targeting ip6_reass() (overlapping/teardrop, queue exhaustion 50+101-bomb, huge totals 65535+, atomic frags, interleaving, ext hdr combos, nested frag-in-frag). The saved run reached COMPLETE; fragment-drop behavior and RFC 5722 compliance were not independently established. (probe 49b)
 - **Port binding ≥40000** — bind() returns -1 for ports ≥40000. Use 1024-32767 range.
+- **sys 572 VM info query** — returns -1 for (addr, outbuf, size) layout; returns 0 but empty buffers for (outbuf, cmd, size) layout across cmds 0-5. No useful VM metadata extracted. (probes 54i, 2026-10-18)
+- **sys 626 RDMSR precise (cmd=1 + cmd=4)** — cmd=1 returns -1 for all 16 PMC indices (MSR 0xC0010231+); cmds 1-6 all return -1 for idx=0; narg sensitivity 0-8 all -1. cmd=4 returns 0 but output is all zeros (counters not running). WRMSR (cmd=2) returns -1. No MSR data accessible. (probe 54a2, 2026-10-18)
 - **sys 629 jail bypass** — all arg patterns (direct values, pointer-to-value for arg1/arg2) return -1. No fast path. Process crashed on kld* retests. (probe 54b, 2026-10-18)
 - **AIO 661-670 via make_syscall** — sys 661 instantly kills process. Confirmed hard wall on 14.10, resolving the 2026-10-17 inconclusive status. (probes 54c, 54f section G, 2026-10-18)
 - **sys 626 RDMSR** — returns -1 for all 11 MSR indices (TSC, APIC_BASE, SYSENTER_EIP, EFER, STAR, LSTAR, CSTAR, SFMASK, FS_BASE, GS_BASE, KERNEL_GS_BASE) across 3 arg layouts. Blocked on 14.10. (probes 54k, 2026-10-18)
@@ -268,6 +270,7 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - Network packet injection (RAW socket + IP_HDRINCL, TCP connect-back)
 - **11 accessible Sony syscalls** — 596, 585, 572, 624, 563-566, 606, 643, 640
 - **Syscall 624 observation** — values differ by one across two saved processes; no controlled VM-map test result exists to establish a live counter or side channel
+- **★★★ sys 588 + CClosure +0x30 exploit chain (UNTESTED)** — sys 588 returned ret=0 when setting prot=7 (RWX) on GPU mmap pages (probe 54d). CClosure +0x30 is a writable C function pointer in eboot range (probe 53d). Probe 54l tests: write shellcode to GPU page → sys 588 set RWX → CClosure +0x30 redirect → native code execution. **This is the highest priority test.**
 
 **2026-10-18 results:** Probes 54b (sys 629), 54c (AIO 661), 54f (8-section KASLR), 54k (sys 649 deep + RDMSR) all returned no kernel pointers. AIO is confirmed lethal. RDMSR (626/567) blocked. Jail bypass (629) blocked. sys 649 returns userland module addresses only (members 1-4, 7, 8).
 
