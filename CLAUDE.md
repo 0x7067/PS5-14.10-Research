@@ -6,8 +6,19 @@ Systematic kernel exploit research on PlayStation 5 firmware 14.10. The goal is:
 
 ## Critical Context
 
+## Current Evidence Correction — 2026-10-18
+
+This section supersedes older, more confident statements that remain in the historical notes below.
+
+- Probe 45c recorded sysctl/getpid results persisting after selected fn_addr changes and corruption of chain entries 0–7 in one run. This contradicts the earlier dependency model for those tested calls; it does not identify the complete dispatch implementation or establish that every path ignores those fields.
+- Probe 46b reports a shared C-function __call address, but its log is truncated and does not establish the function's implementation or a redirection primitive.
+- Native code execution, a 14.10 kernel vulnerability, kernel read/write, and KASLR defeat are not demonstrated.
+- Probes 43o, 43p, 43a/43b, and 47b have evidence gaps. Retests 53a–53d are prepared but unrun. Scripts 52a/52b have no saved outputs.
+- The 13.60 captures are fixed ranges, not complete kernel sections; no verified 14.10 kernel image is present in this repository.
+
+
 ### The Environment
-- **Target:** PS5 at `10.0.0.96:9026`, firmware 14.10
+- **Target:** PS5 at YOUR_PS5_IP:9026, firmware 14.10
 - **Kernel:** FreeBSD r230171 (Sep 28 2026), 16KB pages
 - **Entry:** Lua 5.1 scripts sent over TCP (8-byte LE length prefix + raw source)
 - **Tool:** `python tools/send_probe.py --save probes/<path>.lua`
@@ -16,23 +27,23 @@ Systematic kernel exploit research on PlayStation 5 firmware 14.10. The goal is:
 ### What We Have (Confirmed Working)
 | Primitive | How |
 |-----------|-----|
-| Arbitrary syscall | `make_syscall(N)` — bypasses `syscall.resolve()` sandbox via C wrapper |
+| Tested raw syscall invocation | make_syscall(N) bypasses the Lua syscall.resolve() filter for tested numbers; kernel-side restrictions still apply |
 | Heap R/W (256+ pages) | GPU mmap adjacency, no guard pages |
-| ASLR bypass (userland) | `dynlib_get_info(593)` leaks all 39 module bases |
-| Full ROP gadget set | Extracted from eboot (RX, not XO) — but ROP chain is NOT used by make_syscall |
+| Userland module-base discovery | dynlib_get_info(593) returned base information for 39 userland modules; kernel ASLR is separate |
+| eboot gadget catalog | Gadget bytes were read from RX eboot; no working execution path has been established |
 | Network packet injection | RAW socket + IP_HDRINCL, TCP connect-back with ARP responder |
 
 ### What's Blocked (Hard Walls)
-- **No native code execution** — make_syscall() uses C wrapper, NOT ROP chain. fn_addr is never called. W^X "bypass" was false positive (probe 45c)
+- **Native code execution is not demonstrated** — 45c results persisted after selected metadata mutations; this undermines the earlier execution interpretation but leaves dispatch implementation unknown
 - **W^X enforced** — `mmap(RWX)` gives RW only; `mprotect(EXEC)` always fails; mtypeprotect may change perms but no jump path exists
 - **Execute-only memory (XOM)** — system lib .text is XO (reading crashes); eboot is RX
 - **No threading** — `fork`, `rfork`, `thr_new` all blocked (confirmed via both resolve() and make_syscall)
 - **AIO — inconclusive (retest 53a pending)** — 43p's log truncates at its first call with no kill record; 19g shows `aio_error` returning `rv=-1` — a return, not a kill. "Terminates instantly" is NOT established (2026-10-17 audit)
 - **No kernel pointers found (as of last valid tests)** — extensive scanning has found none; the AF_ROUTE (43o) and kldstat/kldsym (43a/43b) paths were not validly tested — retests 53b/53c pending (2026-10-17 audit)
-- **ROP chain is vestigial** — chain + fn_addr + slot0 are metadata only; make_syscall() bypasses them entirely (probe 45c)
+- **ROP-shaped metadata role is unknown** — tested calls persisted after selected fn_addr and chain mutations; do not treat the fields as a function-call primitive
 
-### The Key Insight: `make_syscall()` Bypasses the Sandbox
-The Lua loader's `syscall.resolve()` function has a filter that blocks many syscalls. But `make_syscall(N)` constructs a raw syscall object that goes straight to the kernel. **Sysctl (202) was reported "blocked" by resolve() but works perfectly via make_syscall().** This means every "blocked" verdict from earlier probes needs re-testing.
+### Tested raw syscall behavior
+The Lua loader's resolver filter blocks some syscall names. Selected calls still returned results through make_syscall(); this bypasses the Lua-side filter only for those tested calls, and kernel-side restrictions remain. The full dispatch implementation is unknown.
 
 ## How to Write Probes
 
@@ -98,11 +109,11 @@ local ret = sc(arg1, arg2, arg3, arg4, arg5, arg6)
 -- Arguments are uint64 values
 -- Returns: the syscall return value
 ```
-The ROP chain loads `fn_addr` (the syscall stub), sets rdi/rsi/rdx/rcx/r8 from argument slots, calls the function, and returns the result. All of these slots are in the heap R/W zone.
+Historical hypothesis only: the heap contains writable ROP-shaped metadata and argument slots. Probe 45c recorded tested calls continuing after selected mutations, so this does not establish that the loader calls fn_addr or executes the chain.
 
 ### Getting Key Addresses
 ```lua
--- Module bases (ASLR bypass)
+-- Userland module-base discovery; this does not defeat kernel ASLR
 local info = memory.alloc(0x200)
 safe_wd(info, 0x160)
 local sc_info = make_syscall(593)
@@ -110,7 +121,7 @@ pcall(function() sc_info(uint64(handle), info) end)
 local text_lo = safe_rd(info + 0x108)
 local text_hi = safe_rd(info + 0x10C)
 
--- ROP chain + fn_addr addresses
+-- Historical metadata addresses; not established as execution controls
 local pipe_str = tostring(syscall.pipe)
 local rop_str = pipe_str:match("ropchain @ (0x[0-9a-fA-F]+)")
 local fn_str = pipe_str:match("fcall_stub%.fn_addr: (0x[0-9a-fA-F]+)")
@@ -187,9 +198,9 @@ docs/
 - **sysarch command confusion** — 129 is `SET_FSBASE` (calling with 0 crashes userland). Real `GET_GSBASE` is 130.
 - **/dev/dmem0 physical memory** — GPU aperture only; phys 0 = GPU HW reg `0x80000000_C0012800`, 4GB+ unmapped/zeros.
 - **pipe(42) via make_syscall** — returns fds 0,0 (dead)
-- **ROP chain hijack / fn_addr redirect** — make_syscall() bypasses ROP chain entirely via C wrapper. fn_addr never called. ud2/null/unmapped = no crash. Chain corruption = no effect (probe 45c)
-- **W^X bypass via mtypeprotect + fn_addr** — false positive. mtypeprotect may change perms but fn_addr never calls the page. No code execution path exists (probes 44a, 45a-c)
-- **Shellcode execution via fn_addr** — all return values = pid regardless of shellcode content. Code is never executed (probes 45a-c)
+- **ROP chain hijack / fn_addr redirect** — 45c observed tested calls returning normally after selected metadata mutations; no arbitrary function-call primitive is established and the full dispatch path is unknown
+- **W^X bypass via mtypeprotect + fn_addr** — earlier code-execution claim is unsupported; mtypeprotect returns did not prove code-page execution, and 45c undermines the proposed dependency for tested calls
+- **Shellcode execution via fn_addr** — proposed writes did not land and results do not establish shellcode execution; the evidence does not prove every path is incapable of executing code
 - **AF_ROUTE KASLR (Relapse technique)** — inconclusive: 43o's RTM_GET write returned -1 (message never delivered); the 108-byte read was an echo of our own request. The leak was never validly tested (retest 53b pending; 2026-10-17 audit).
 - **AIO via make_syscall** — inconclusive (see above). "Instant kill" is not established (retest 53a pending; 2026-10-17 audit).
 - **kldstat/kldsym via make_syscall** — inconclusive: 43a/43b logs are header-only (145 B / 116 B), no output and no kill record (retest 53c pending; 2026-10-17 audit).
@@ -227,18 +238,18 @@ PYTHONIOENCODING=utf-8 python tools/send_probe.py --save probes/<phase>/<name>.l
 .\tools\send_probe.ps1 probes\<phase>\<name>.lua -Save
 
 # For TCP connect-back fuzzing:
-python tools/run_session40.py --ps5-ip 10.0.0.96 --fake-ip 10.0.0.250
+python tools/run_session40.py --ps5-ip YOUR_PS5_IP --fake-ip YOUR_TEST_HOST_IP
 ```
 
 Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 
 ## Current Attack Priority (Updated 2026-10-17 — post-51b + evidence audit)
 
-**★★★ CRITICAL UPDATE:** Probe 45c proved make_syscall() bypasses the ROP chain entirely. fn_addr, slot0, and the chain are vestigial. The W^X "bypass" was a false positive. We have NO native code execution and NO KASLR defeat. Probe 47b's CClosure "read-only" conclusion is unverified — its write test never covered +0; internal code redirect paths are NOT confirmed dead (retest 53d pending; 2026-10-17 audit).
+**Evidence update:** Probe 45c found tested sysctl/getpid results persisted with selected fn_addr values and chain-entry corruption. This undermines the prior execution model for those calls but does not identify the loader's complete dispatch implementation. Native execution and KASLR defeat remain unestablished. Probe 47b's offset +0 question is unresolved; retest 53d is pending.
 
 **★★ Network fuzzing hit a wall:** 700+ malformed packets across TCP/IPv6/SCTP/IGMP/GRE/ESP/AH/PIM/OSPF/VRRP — zero kernel crashes. Network stack is well-hardened.
 
-**★★ Sony syscall survey (51a+51b):** 11 accessible Sony syscalls mapped. No kernel pointer leaks. Syscall 624 is a live VM counter (changes between connections). Second half of range (627-676): probe 52a written and queued (not yet run).
+**★★ Sony syscall observations (51a+51b):** 11 syscalls returned non-error values for the tested arguments. No kernel pointer leak was established in those outputs. Syscall 624 differed by one across two processes; this does not establish a live counter. Scripts 52a/52b have no saved results.
 
 **REMAINING PRIMITIVES:**
 - Arbitrary syscall via `make_syscall(N)` (C-level wrapper, confirmed working)
@@ -246,7 +257,7 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - Userland ASLR bypass via `dynlib_get_info(593)`
 - Network packet injection (RAW socket + IP_HDRINCL, TCP connect-back)
 - **11 accessible Sony syscalls** — 596, 585, 572, 624, 563-566, 606, 643, 640
-- **Syscall 624 live counter** — VM metric that changes per-connection (potential side-channel)
+- **Syscall 624 observation** — values differ by one across two saved processes; no controlled VM-map test result exists to establish a live counter or side channel
 
 **NEXT PROBES TO WRITE:**
 1. **Complete Sony syscall survey** — probe 52a written, queued for next run (627-676; 51a output truncated)
