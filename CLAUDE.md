@@ -32,13 +32,14 @@ This section supersedes older, more confident statements that remain in the hist
 | Userland module-base discovery | dynlib_get_info(593) returned base information for 39 userland modules; kernel ASLR is separate |
 | eboot gadget catalog | Gadget bytes were read from RX eboot; no working execution path has been established |
 | Network packet injection | RAW socket + IP_HDRINCL, TCP connect-back with ARP responder |
+| sys 649 module member query | Returns userland addresses for member types 1-4, 7, 8 across module handles (no kernel pointers). Probe 54k, 2026-10-18 |
 
 ### What's Blocked (Hard Walls)
 - **Native code execution is not demonstrated** — 45c results persisted after selected metadata mutations; this undermines the earlier execution interpretation but leaves dispatch implementation unknown
 - **W^X enforced** — `mmap(RWX)` gives RW only; `mprotect(EXEC)` always fails; mtypeprotect may change perms but no jump path exists
 - **Execute-only memory (XOM)** — system lib .text is XO (reading crashes); eboot is RX
 - **No threading** — `fork`, `rfork`, `thr_new` all blocked (confirmed via both resolve() and make_syscall)
-- **AIO — inconclusive (retest 53a pending)** — 43p's log truncates at its first call with no kill record; 19g shows `aio_error` returning `rv=-1` — a return, not a kill. "Terminates instantly" is NOT established (2026-10-17 audit)
+- **AIO 661-670 — confirmed hard wall** — sys 661 instantly kills the process on 14.10. Tested via probes 54c and 54f section G (2026-10-18). The earlier 43p inconclusive status is resolved: AIO event syscalls are lethal.
 - **No kernel pointers found (as of last valid tests)** — extensive scanning has found none; the AF_ROUTE (43o) and kldstat/kldsym (43a/43b) paths were not validly tested — retests 53b/53c pending (2026-10-17 audit)
 - **ROP-shaped metadata role is unknown** — tested calls persisted after selected fn_addr and chain mutations; do not treat the fields as a function-call primitive
 
@@ -183,7 +184,7 @@ docs/
 - **mprotect(EXEC)** — always fails, hard W^X
 - **XOM gadget scan** — reading XO pages crashes past pcall
 - **Threading via resolve()** — fork/rfork/thr_new all -1
-- **AIO** — inconclusive: 43p truncated at its first call with no kill record (retest 53a pending; 2026-10-17 audit)
+- **AIO** — **CONFIRMED DEAD**: sys 661 instantly kills the process on 14.10 (probes 54c/54f, 2026-10-18). Previous 43p inconclusive status resolved.
 - **kqueue** — fd allocates but kevent returns -1
 - **ioctl via resolve()** — all blocked (untested via make_syscall)
 - **sysctl kernel pointer leaks** — all scanned pointers are sentinels (0xFFFFFFFF_*)
@@ -202,7 +203,7 @@ docs/
 - **W^X bypass via mtypeprotect + fn_addr** — earlier code-execution claim is unsupported; mtypeprotect returns did not prove code-page execution, and 45c undermines the proposed dependency for tested calls
 - **Shellcode execution via fn_addr** — proposed writes did not land and results do not establish shellcode execution; the evidence does not prove every path is incapable of executing code
 - **AF_ROUTE KASLR (Relapse technique)** — inconclusive: 43o logged RTM_GET write ret=-1, a 108-byte read and zero detected kernel pointers; the read's origin is unresolved. Successful request delivery and a valid disclosure test are not established (retest 53b pending; 2026-10-17 audit).
-- **AIO via make_syscall** — inconclusive (see above). "Instant kill" is not established (retest 53a pending; 2026-10-17 audit).
+- **AIO via make_syscall** — **CONFIRMED**: sys 661 instantly kills process. "Instant kill" IS established (probes 54c/54f, 2026-10-18).
 - **kldstat/kldsym via make_syscall** — inconclusive: 43a/43b logs are header-only (145 B / 116 B), no output and no kill record (retest 53c pending; 2026-10-17 audit).
 - **kinfo_proc kernel pointers** — full 1096B dump: only sentinels, no real kernel pointers.
 - **kern.proc.filedesc/vmmap** — blocked (ret=-1)
@@ -227,6 +228,15 @@ docs/
 - **TCP state machine injection** — 182 crafted segments into ESTABLISHED loopback connection (RST, SACK, PAWS, option parser len=0/255, URG, zero-window, ACK storm, SYN flood). The saved run reached COMPLETE. TCP_INFO values at +108/+112 tracked sequence numbers in that run; this does not establish TCP hardening or RFC compliance. (probe 49a)
 - **IPv6 fragment reassembly attacks** — 280 fragments targeting ip6_reass() (overlapping/teardrop, queue exhaustion 50+101-bomb, huge totals 65535+, atomic frags, interleaving, ext hdr combos, nested frag-in-frag). The saved run reached COMPLETE; fragment-drop behavior and RFC 5722 compliance were not independently established. (probe 49b)
 - **Port binding ≥40000** — bind() returns -1 for ports ≥40000. Use 1024-32767 range.
+- **sys 629 jail bypass** — all arg patterns (direct values, pointer-to-value for arg1/arg2) return -1. No fast path. Process crashed on kld* retests. (probe 54b, 2026-10-18)
+- **AIO 661-670 via make_syscall** — sys 661 instantly kills process. Confirmed hard wall on 14.10, resolving the 2026-10-17 inconclusive status. (probes 54c, 54f section G, 2026-10-18)
+- **sys 626 RDMSR** — returns -1 for all 11 MSR indices (TSC, APIC_BASE, SYSENTER_EIP, EFER, STAR, LSTAR, CSTAR, SFMASK, FS_BASE, GS_BASE, KERNEL_GS_BASE) across 3 arg layouts. Blocked on 14.10. (probes 54k, 2026-10-18)
+- **sys 567 RDMSR read** — returns -1 for all MSR indices with both flat and struct arg layouts. (probe 54k, 2026-10-18)
+- **sys 612** — returns -1 for all tested member values 0-8. (probe 54k, 2026-10-18)
+- **sys 598 dynlib context** — returns -1 for all arg patterns tested. (probe 54f section A, 2026-10-18)
+- **sys 639/638 memory region** — returns -1 for all address ranges including zero, low, heap, module, libkernel, and kernel VA. (probe 54f section C, 2026-10-18)
+- **net.route.iflistl kernel pointer scan** — returned 6536 bytes but all values are sockaddr/MAC/interface structures, no kernel pointers. (probe 54f section D, 2026-10-18)
+- **sys 593 deep struct scan (+0x148/+0x150)** — values across all 39 modules are NID hashes/fingerprints (random high bits but not in kernel VA range 0xFFFF8xxx), not kernel pointers. (probe 54f section F, 2026-10-18)
 
 ## Sending Probes
 
@@ -243,7 +253,7 @@ python tools/run_session40.py --ps5-ip YOUR_PS5_IP --fake-ip YOUR_TEST_HOST_IP
 
 Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 
-## Current Attack Priority (Updated 2026-10-17 — post-51b + evidence audit)
+## Current Attack Priority (Updated 2026-10-18 — post-54b/54c/54f/54k results)
 
 **Evidence update:** Probe 45c found tested sysctl/getpid results persisted with selected fn_addr values and chain-entry corruption. This undermines the prior execution model for those calls but does not identify the loader's complete dispatch implementation. Native execution and KASLR defeat remain unestablished. Probe 47b's offset +0 question is unresolved; retest 53d is pending.
 
