@@ -269,6 +269,8 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - **11 accessible Sony syscalls** — 596, 585, 572, 624, 563-566, 606, 643, 640
 - **Syscall 624 observation** — values differ by one across two saved processes; no controlled VM-map test result exists to establish a live counter or side channel
 
+**2026-10-18 results:** Probes 54b (sys 629), 54c (AIO 661), 54f (8-section KASLR), 54k (sys 649 deep + RDMSR) all returned no kernel pointers. AIO is confirmed lethal. RDMSR (626/567) blocked. Jail bypass (629) blocked. sys 649 returns userland module addresses only (members 1-4, 7, 8).
+
 **NEXT PROBES TO WRITE:**
 1. **Complete Sony syscall survey** — probe 52a written, queued for next run (627-676; 51a output truncated)
 2. **Syscall 624 as heap oracle** — probe 52b written, queued for next run
@@ -276,7 +278,7 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 4. **Syscall 640 with varied arg patterns** — returns 0 but buffer empty, try different structures
 5. **PC-coordinated network attacks** — real network packets from external host (not loopback)
 6. **Loader internals** — find the C-level syscall dispatch, check for writable function pointers
-7. **Evidence-audit retests (53a–53d)** — AIO survival, fixed AF_ROUTE RTM_GET, kldstat/kldsym, CClosure +0 write test
+7. **Evidence-audit retests (53b–53d)** — fixed AF_ROUTE RTM_GET, kldstat/kldsym, CClosure +0 write test (53a AIO retest no longer needed — confirmed dead)
 
 ## When Analyzing Results
 
