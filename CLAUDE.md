@@ -218,7 +218,7 @@ docs/
 - **sockopt overflow** — kernel clamps copy length, not exploitable
 - **/dev/hid ioctl** — Sony error 0x80740004 on all codes
 - **Syscall 557** — saved 46a/47a tests show argument-dependent returns, including a linear version pattern for tested positive versions in 47a and a special version-zero result. No kernel pointer or exploit was demonstrated; full semantics and exploitability remain unresolved.
-- **Syscall 620** — always returns 0, doesn't modify buffers. No-op.
+- **Syscall 620** — the saved 46a re-run returns 0 for its tested inputs; sentinel checks report no changes in their monitored windows. The zero-struct dump used the same incorrect baseline as 557 and is not write evidence. Full semantics remain unresolved; see `docs/SYSCALL_557_14_10_EVIDENCE.md`.
 - **CClosure C function pointer redirect** — retest 53d confirmed ALL 7 offsets (+0x00 through +0x30) are writable with successful restore. +0x30 was observed holding an eboot-range pointer, but the field consumed by dispatch is unresolved. Probes 54o/54p tested a `+0x20` candidate and stopped before a returned value or restore marker; no execution redirect is established.
 - **SCTP chunk fuzzing** — 39 variants via loopback raw socket, zero crashes (probe 48b)
 - **IPv6 extension header fuzzing** — 83 variants, zero crashes (probe 48c)
