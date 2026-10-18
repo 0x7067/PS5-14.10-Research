@@ -27,8 +27,8 @@ Systematic kernel exploit research on PlayStation 5 firmware 14.10. The goal is:
 - **W^X enforced** — `mmap(RWX)` gives RW only; `mprotect(EXEC)` always fails; mtypeprotect may change perms but no jump path exists
 - **Execute-only memory (XOM)** — system lib .text is XO (reading crashes); eboot is RX
 - **No threading** — `fork`, `rfork`, `thr_new` all blocked (confirmed via both resolve() and make_syscall)
-- **AIO sandbox-killed** — all `aio_*` terminate instantly (confirmed kernel-level, not resolve()-side)
-- **No kernel pointers in userland** — all info leak paths exhaustively tested and dead
+- **AIO — inconclusive (retest 53a pending)** — 43p's log truncates at its first call with no kill record; 19g shows `aio_error` returning `rv=-1` — a return, not a kill. "Terminates instantly" is NOT established (2026-10-17 audit)
+- **No kernel pointers found (as of last valid tests)** — extensive scanning has found none; the AF_ROUTE (43o) and kldstat/kldsym (43a/43b) paths were not validly tested — retests 53b/53c pending (2026-10-17 audit)
 - **ROP chain is vestigial** — chain + fn_addr + slot0 are metadata only; make_syscall() bypasses them entirely (probe 45c)
 
 ### The Key Insight: `make_syscall()` Bypasses the Sandbox
@@ -149,9 +149,11 @@ probes/
   phase7_heap_exploitation/  # 40-41: GPU mmap, heap R/W, ROP, ASLR bypass
   phase8_live_network/       # 40tcp, 42: TCP fuzz, ktimer, live testing
   phase9_kaslr_defeat/       # 42b-42j: KASLR attempts (mostly failed)
-  phase10_untested_theories/ # 43a+: theory-driven probes (READY TO SEND)
+  phase10_untested_theories/ # 43a+: theory-driven probes (results recorded; 2026-10-17 audit)
   phase11_network_attacks/   # 48a-50d: SCTP, IPv6, TCP inject, exotic protocols
   phase12_kernel_analysis/   # 51a+: kernel dump sysent analysis, Sony syscall survey
+  phase13_52batch/           # 52a+: Sony syscall survey 627-676 + 624 oracle (written, queued)
+phase13_53batch/           # 53a-53d: evidence-audit retests (AIO, AF_ROUTE, kldstat, CClosure)
 results/                     # Output logs (same phase structure)
 tools/                       # send_probe.py, run_session40.py, tcp_fuzz_server.py
 docs/
@@ -164,11 +166,13 @@ docs/
 
 ## Known Dead Ends (Don't Repeat These)
 
+> Note (2026-10-17 evidence audit): entries marked inconclusive / "not established" reflect claim downgrades — see docs/EVIDENCE_AUDIT_2026-10-17.md.
+
 - **sigaltstack kernel write** — copyout() validates destinations
 - **mprotect(EXEC)** — always fails, hard W^X
 - **XOM gadget scan** — reading XO pages crashes past pcall
 - **Threading via resolve()** — fork/rfork/thr_new all -1
-- **AIO** — sandbox-killed instantly
+- **AIO** — inconclusive: 43p truncated at its first call with no kill record (retest 53a pending; 2026-10-17 audit)
 - **kqueue** — fd allocates but kevent returns -1
 - **ioctl via resolve()** — all blocked (untested via make_syscall)
 - **sysctl kernel pointer leaks** — all scanned pointers are sentinels (0xFFFFFFFF_*)
@@ -176,7 +180,7 @@ docs/
 - **minherit/msync** — instant-kill syscalls
 - **memfd_create** — stub, does nothing
 - **/dev/dmem0** — opens but all operations fail (GPU partition only)
-- **kenv** — sandbox kill
+- **kenv** — outcome unverified: 42a/42g2 captures stop at the kenv header without a call result or kill record
 - **TCB (FS base)** — userland only (0x88xxxxxxxx)
 - **libkernel data segment scan** — no kernel pointers
 - **kldstat at syscall 306** — 306 is `kldfind` (crashed on bad arg). Real FreeBSD `kldstat` is 308; sweep 02 had 367. Probe 43a tests both.
@@ -186,9 +190,9 @@ docs/
 - **ROP chain hijack / fn_addr redirect** — make_syscall() bypasses ROP chain entirely via C wrapper. fn_addr never called. ud2/null/unmapped = no crash. Chain corruption = no effect (probe 45c)
 - **W^X bypass via mtypeprotect + fn_addr** — false positive. mtypeprotect may change perms but fn_addr never calls the page. No code execution path exists (probes 44a, 45a-c)
 - **Shellcode execution via fn_addr** — all return values = pid regardless of shellcode content. Code is never executed (probes 45a-c)
-- **AF_ROUTE KASLR (Relapse technique)** — socket opens, zero kernel pointers. Info leak patched on 14.10.
-- **AIO via make_syscall** — sandbox kill is kernel-level. aio_error instant-kills even raw.
-- **kldstat/kldsym via make_syscall** — both sandbox-killed at kernel level.
+- **AF_ROUTE KASLR (Relapse technique)** — inconclusive: 43o's RTM_GET write returned -1 (message never delivered); the 108-byte read was an echo of our own request. The leak was never validly tested (retest 53b pending; 2026-10-17 audit).
+- **AIO via make_syscall** — inconclusive (see above). "Instant kill" is not established (retest 53a pending; 2026-10-17 audit).
+- **kldstat/kldsym via make_syscall** — inconclusive: 43a/43b logs are header-only (145 B / 116 B), no output and no kill record (retest 53c pending; 2026-10-17 audit).
 - **kinfo_proc kernel pointers** — full 1096B dump: only sentinels, no real kernel pointers.
 - **kern.proc.filedesc/vmmap** — blocked (ret=-1)
 - **sysctl write paths** — all blocked (securelevel, coredump, maxproc)
@@ -202,7 +206,7 @@ docs/
 - **/dev/hid ioctl** — Sony error 0x80740004 on all codes
 - **Syscall 557** — returns formula-based metric (base+ver), base varies per connection. Not exploitable.
 - **Syscall 620** — always returns 0, doesn't modify buffers. No-op.
-- **CClosure C function pointer redirect** — CClosure +0 (C func ptr) is READ-ONLY. Upvalues (+16-48) writable but don't control dispatch. All metatable functions same. (probe 47b)
+- **CClosure C function pointer redirect** — unverified: 47b never write-tested +0 (its loop covered {16,24,32,40,48}); its log contradicts itself at +0 ("C FUNCTION CANDIDATE" vs heap values) (retest 53d pending; 2026-10-17 audit).
 - **SCTP chunk fuzzing** — 39 variants via loopback raw socket, zero crashes (probe 48b)
 - **IPv6 extension header fuzzing** — 83 variants, zero crashes (probe 48c)
 - **TCP state machine injection** — 182 crafted segments, zero crashes. RFC 5961 challenge ACK confirmed. (probe 49a)
@@ -228,13 +232,13 @@ python tools/run_session40.py --ps5-ip 10.0.0.96 --fake-ip 10.0.0.250
 
 Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 
-## Current Attack Priority (Updated 2026-10-17 — post-51b)
+## Current Attack Priority (Updated 2026-10-17 — post-51b + evidence audit)
 
-**★★★ CRITICAL UPDATE:** Probe 45c proved make_syscall() bypasses the ROP chain entirely. fn_addr, slot0, and the chain are vestigial. The W^X "bypass" was a false positive. We have NO native code execution and NO KASLR defeat. Probe 47b confirmed CClosure C func ptr is read-only — all internal code redirect paths are dead.
+**★★★ CRITICAL UPDATE:** Probe 45c proved make_syscall() bypasses the ROP chain entirely. fn_addr, slot0, and the chain are vestigial. The W^X "bypass" was a false positive. We have NO native code execution and NO KASLR defeat. Probe 47b's CClosure "read-only" conclusion is unverified — its write test never covered +0; internal code redirect paths are NOT confirmed dead (retest 53d pending; 2026-10-17 audit).
 
 **★★ Network fuzzing hit a wall:** 700+ malformed packets across TCP/IPv6/SCTP/IGMP/GRE/ESP/AH/PIM/OSPF/VRRP — zero kernel crashes. Network stack is well-hardened.
 
-**★★ Sony syscall survey (51a+51b):** 11 accessible Sony syscalls mapped. No kernel pointer leaks. Syscall 624 is a live VM counter (changes between connections). Second half of range (627-676) untested.
+**★★ Sony syscall survey (51a+51b):** 11 accessible Sony syscalls mapped. No kernel pointer leaks. Syscall 624 is a live VM counter (changes between connections). Second half of range (627-676): probe 52a written and queued (not yet run).
 
 **REMAINING PRIMITIVES:**
 - Arbitrary syscall via `make_syscall(N)` (C-level wrapper, confirmed working)
@@ -245,12 +249,13 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - **Syscall 624 live counter** — VM metric that changes per-connection (potential side-channel)
 
 **NEXT PROBES TO WRITE:**
-1. **Complete Sony syscall survey** — syscalls 627-676 untested (51a output truncated)
-2. **Syscall 624 as heap oracle** — call in loop, correlate with allocations, measure sensitivity
+1. **Complete Sony syscall survey** — probe 52a written, queued for next run (627-676; 51a output truncated)
+2. **Syscall 624 as heap oracle** — probe 52b written, queued for next run
 3. **Syscalls 606/643 with event structures** — may be evdev/notification syscalls needing proper args
 4. **Syscall 640 with varied arg patterns** — returns 0 but buffer empty, try different structures
 5. **PC-coordinated network attacks** — real network packets from external host (not loopback)
 6. **Loader internals** — find the C-level syscall dispatch, check for writable function pointers
+7. **Evidence-audit retests (53a–53d)** — AIO survival, fixed AF_ROUTE RTM_GET, kldstat/kldsym, CClosure +0 write test
 
 ## When Analyzing Results
 
