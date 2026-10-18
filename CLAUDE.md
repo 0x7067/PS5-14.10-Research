@@ -188,7 +188,7 @@ docs/
 - **ioctl via resolve()** — all blocked (untested via make_syscall)
 - **sysctl kernel pointer leaks** — all scanned pointers are sentinels (0xFFFFFFFF_*)
 - **TCP_INFO** — 236 bytes, no kernel pointers
-- **minherit/msync** — instant-kill syscalls
+- **minherit/msync** — outcomes unresolved: probe 38 ends at the minherit section header; 42b ends after the msync section prints its region address. Neither log records a call result or establishes a termination cause.
 - **memfd_create** — stub, does nothing
 - **/dev/dmem0** — opens but all operations fail (GPU partition only)
 - **kenv** — outcome unverified: 42a/42g2 captures stop at the kenv header without a call result or kill record
@@ -215,7 +215,7 @@ docs/
 - **mincore KASLR oracle** — all kernel VA probes return -1
 - **sockopt overflow** — kernel clamps copy length, not exploitable
 - **/dev/hid ioctl** — Sony error 0x80740004 on all codes
-- **Syscall 557** — returns formula-based metric (base+ver), base varies per connection. Not exploitable.
+- **Syscall 557** — saved 46a/47a tests show argument-dependent returns, including a linear version pattern for tested positive versions in 47a and a special version-zero result. No kernel pointer or exploit was demonstrated; full semantics and exploitability remain unresolved.
 - **Syscall 620** — always returns 0, doesn't modify buffers. No-op.
 - **CClosure C function pointer redirect** — unverified: 47b never write-tested +0 (its loop covered {16,24,32,40,48}); its log contradicts itself at +0 ("C FUNCTION CANDIDATE" vs heap values) (retest 53d pending; 2026-10-17 audit).
 - **SCTP chunk fuzzing** — 39 variants via loopback raw socket, zero crashes (probe 48b)
