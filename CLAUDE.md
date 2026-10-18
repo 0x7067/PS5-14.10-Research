@@ -245,6 +245,7 @@ docs/
 - **sys 622 device control** — every command (0x100-0x520, 400+ commands) returns ret=0 with buf[0]=0x800E0001 (Sony error "no device context"). No crashes, no variation, no kernel pointers. Process lacks initialized GPU device context. (probe 55c, 2026-10-18)
 - **sys 548 batch VM ops** — all operation codes (0=new mapping, 2=protection update, 3=anonymous mapping) return ret=-1, processed=0. Different code path from mprotect but equally blocked. W^X not bypassable via this route. (probe 55b, 2026-10-18)
 - **sys 622 device control multiplexer** — all 400+ commands across ranges 0x100-0x520 return ret=0 with buf[0]=0x800E0001 (Sony error: no device context). Every arg1 value tested gives same result. Process lacks GPU/display context so all commands early-exit. No data, no crashes, no kernel pointers. (probes 55b/55c, 2026-10-18)
+- **sys 601 process control multiplexer** — most commands return -1 (no init state). cmd 0x00 ret=0 buf=0x100, cmds 0x07/0x09/0x0d/0x13/0x14/0x19 ret=0 with empty buffers. "Backdoor" cmd 0x0c returns -1 for all auth patterns. "Write" cmd 0x12 returns -1. Kernel page copyout cmd 0x10 returns -1. Process lacks initialization. Game crashed during full scan. (probe 55d, 2026-10-18)
 
 ## Sending Probes
 
