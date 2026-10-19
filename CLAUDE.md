@@ -42,7 +42,7 @@ This section scopes the current claims; older notes describe their cited probe s
 - **W^X enforced** — `mmap(RWX)` gives RW only; `mprotect(EXEC)` always fails; mtypeprotect returns do not prove execute permissions or execution of the allocated test page
 - **Execute-only memory (XOM)** — system lib .text is XO (reading crashes); eboot is RX
 - **No threading** — `fork`, `rfork`, `thr_new` all blocked (confirmed via both resolve() and make_syscall)
-- **AIO 661-670 — confirmed hard wall** — sys 661 instantly kills the process on 14.10. Tested via probes 54c and 54f section G (2026-10-18). The earlier 43p inconclusive status is resolved: AIO event syscalls are lethal.
+- **Sys 661 kills the process** — kills instantly on 14.10 for the two tested argument shapes (probes 54c and 54f section G, 2026-10-18). But both captures stop at 661, so 662-670 were never executed: the range-wide "AIO hard wall" is an n=1 generalization. See `docs/AIO_RANGE_14_10_EVIDENCE.md`.
 - **No kernel pointers found** — extensive scanning has found none. AF_ROUTE retest 53b confirmed kernel sanitizes route messages (zero kernel pointers). kldstat/kldsym (43a/43b) retest 53c never ran (connection refused). No KASLR defeat path identified.
 - **ROP-shaped metadata role is unknown** — tested calls persisted after selected fn_addr and chain mutations; do not treat the fields as a function-call primitive
 
@@ -187,7 +187,7 @@ docs/
 - **mprotect(EXEC)** — always fails, hard W^X
 - **XOM gadget scan** — reading XO pages crashes past pcall
 - **Threading via resolve()** — fork/rfork/thr_new all -1
-- **AIO** — **CONFIRMED DEAD**: sys 661 instantly kills the process on 14.10 (probes 54c/54f, 2026-10-18). Previous 43p inconclusive status resolved.
+- **AIO** — sys 661 instantly kills the process on 14.10 for the two tested argument shapes (probes 54c/54f, 2026-10-18). Scope correction: both captures terminate at 661, so 662-670 were never reached; the earlier range-wide verdict is unsupported. See `docs/AIO_RANGE_14_10_EVIDENCE.md`.
 - **kqueue** — fd allocates but kevent returns -1
 - **ioctl via resolve()** — all blocked (untested via make_syscall)
 - **sysctl kernel pointer leaks** — all scanned pointers are sentinels (0xFFFFFFFF_*)
@@ -206,7 +206,7 @@ docs/
 - **W^X bypass via mtypeprotect + fn_addr** — earlier code-execution claim is unsupported; mtypeprotect returns did not prove code-page execution, and 45c undermines the proposed dependency for tested calls
 - **Shellcode execution via fn_addr** — proposed writes did not land and results do not establish shellcode execution; the evidence does not prove every path is incapable of executing code
 - **AF_ROUTE KASLR (Relapse technique)** — **CONFIRMED DEAD**: retest 53b delivered RTM_GET (hdr=152, write ret=168), received valid 136-byte response (version=5, type=4, pid=112), but all payload is zeroed sockaddr structures — zero kernel pointers. Kernel sanitizes route messages on 14.10. (probes 43o, 53b retest 2026-10-18)
-- **AIO via make_syscall** — **CONFIRMED**: sys 661 instantly kills process. "Instant kill" IS established (probes 54c/54f, 2026-10-18).
+- **Sys 661 via make_syscall** — "instant kill" IS established for the two tested argument shapes (probes 54c/54f, 2026-10-18). But 662-670 were never reached in either capture (190 B ending at `[BEFORE] sys 661`; 15,257 B ending at the section-G header), so range-wide lethality is not established.
 - **kldstat/kldsym via make_syscall** — inconclusive: 43a/43b logs are header-only (145 B / 116 B), no output and no kill record (retest 53c pending; 2026-10-17 audit).
 - **kinfo_proc kernel pointers** — full 1096B dump: only sentinels, no real kernel pointers.
 - **kern.proc.filedesc/vmmap** — blocked (ret=-1)
@@ -234,7 +234,7 @@ docs/
 - **sys 572 VM info query** — returns -1 for (addr, outbuf, size) layout; returns 0 but empty buffers for (outbuf, cmd, size) layout across cmds 0-5. No useful VM metadata extracted. (probes 54i, 2026-10-18)
 - **sys 626 RDMSR precise (cmd=1 + cmd=4)** — cmd=1 returns -1 for all 16 PMC indices (MSR 0xC0010231+); cmds 1-6 all return -1 for idx=0; narg sensitivity 0-8 all -1. cmd=4 returns 0 but output is all zeros (counters not running). WRMSR (cmd=2) returns -1. No MSR data accessible. (probe 54a2, 2026-10-18)
 - **sys 629 jail bypass** — all arg patterns (direct values, pointer-to-value for arg1/arg2) return -1. No fast path. Process crashed on kld* retests. (probe 54b, 2026-10-18)
-- **AIO 661-670 via make_syscall** — sys 661 instantly kills process. Confirmed hard wall on 14.10, resolving the 2026-10-17 inconclusive status. (probes 54c, 54f section G, 2026-10-18)
+- **Sys 661 via make_syscall (two argument shapes)** — instantly kills process on 14.10 (probes 54c, 54f section G, 2026-10-18). Scope correction 2026-10-19: this kills at the first number of each sweep, so 662-670 were never executed; use `tools/syscall_isolation_sweep.py` for one-connection-per-number measurement.
 - **sys 626 RDMSR** — returns -1 for all 11 MSR indices (TSC, APIC_BASE, SYSENTER_EIP, EFER, STAR, LSTAR, CSTAR, SFMASK, FS_BASE, GS_BASE, KERNEL_GS_BASE) across 3 arg layouts. Blocked on 14.10. (probes 54k, 2026-10-18)
 - **sys 567 RDMSR read** — returns -1 for all MSR indices with both flat and struct arg layouts. (probe 54k, 2026-10-18)
 - **sys 612** — returns -1 for all tested member values 0-8. (probe 54k, 2026-10-18)
@@ -275,7 +275,7 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 
 ## Current Attack Priority (Updated 2026-10-18 — post-55g results)
 
-**Evidence update:** Phase 14 (54a–55g) examined KASLR candidates, Sony syscalls, and device control paths. The examined paths have not established a kernel base, including the tested AF_ROUTE, RDMSR, sys 674 VM map, sys 649 module member, kinfo_proc and net.route.iflistl paths. These results do not establish that every possible KASLR technique is unavailable. AIO is confirmed lethal. sys 622/601/548 are dead.
+**Evidence update:** Phase 14 (54a–55g) examined KASLR candidates, Sony syscalls, and device control paths. The examined paths have not established a kernel base, including the tested AF_ROUTE, RDMSR, sys 674 VM map, sys 649 module member, kinfo_proc and net.route.iflistl paths. These results do not establish that every possible KASLR technique is unavailable. Sys 661 kills; the rest of 662-670 is unmeasured. sys 622/601/548 are dead.
 
 **CClosure +0x20: target bytes, write boundaries and later returned effects:**
 - 55g wrote +1 to type()'s +0x20 low dword; output changes to binary after the write marker. The executed instruction and termination cause are not identified by that capture. Section D records same-value/no-op writes at +0x00, +0x08, +0x10, +0x18, +0x28 and +0x30. Sections E/F record different-value writes only at +0x18 and +0x00, followed by restoration; those operations returned without a recorded behavioral change.
