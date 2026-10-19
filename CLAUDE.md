@@ -189,6 +189,8 @@ docs/
 - **Threading via resolve()** — fork/rfork/thr_new all -1
 - **AIO** — sys 661 instantly kills the process on 14.10 for the two tested argument shapes (probes 54c/54f, 2026-10-18). Scope correction: both captures terminate at 661, so 662-670 were never reached; the earlier range-wide verdict is unsupported. See `docs/AIO_RANGE_14_10_EVIDENCE.md`.
 - **kqueue** — fd allocates but kevent returns -1
+- **AIO** — **CONFIRMED DEAD**: sys 661 instantly kills the process on 14.10 (probes 54c/54f, 2026-10-18). Previous 43p inconclusive status resolved.
+- **kqueue** — fd allocates; kevent works with zero timeout (split and combined calls, probes 20/21), only the 100ms-timeout call returns -1 (probe 30c). See `docs/KEVENT_TIMEOUT_VARIABLE.md`.
 - **ioctl via resolve()** — all blocked (untested via make_syscall)
 - **sysctl kernel pointer leaks** — all scanned pointers are sentinels (0xFFFFFFFF_*)
 - **TCP_INFO** — 236 bytes, no kernel pointers
