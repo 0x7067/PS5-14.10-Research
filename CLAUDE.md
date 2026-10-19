@@ -188,7 +188,7 @@ docs/
 - **XOM gadget scan** — reading XO pages crashes past pcall
 - **Threading via resolve()** — fork/rfork/thr_new all -1
 - **AIO** — **CONFIRMED DEAD**: sys 661 instantly kills the process on 14.10 (probes 54c/54f, 2026-10-18). Previous 43p inconclusive status resolved.
-- **kqueue** — fd allocates but kevent returns -1
+- **kqueue** — fd allocates; kevent works with zero timeout (split and combined calls, probes 20/21), only the 100ms-timeout call returns -1 (probe 30c). See `docs/KEVENT_TIMEOUT_VARIABLE.md`.
 - **ioctl via resolve()** — all blocked (untested via make_syscall)
 - **sysctl kernel pointer leaks** — all scanned pointers are sentinels (0xFFFFFFFF_*)
 - **TCP_INFO** — 236 bytes, no kernel pointers
