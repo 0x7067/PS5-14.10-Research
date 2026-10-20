@@ -256,6 +256,8 @@ docs/
 - **sys 671 resource class query** — sel=-1 mode=1: A=6144, B=3948. mode=2: A=2560, B=2014. Explicit selectors 0-10 all failed (needs credential bit 62). Memory budget values only. (probe 55e, 2026-10-18)
 - **sys 631** — instantly kills process. Lethal on 14.10. (probe 52a, 2026-10-18)
 - **sys 627-630** — all return PCALL-FAIL (exception/crash caught by pcall). (probe 52a, 2026-10-18)
+- **sys 677** — instantly kills process AND crashes the game (loader stops accepting connections). LETHAL + GAME CRASH. (syscall_isolation_sweep, 2026-10-20)
+- **sys 678** — instantly kills process AND crashes the game. Same behavior as 677. LETHAL + GAME CRASH. (syscall_isolation_sweep, 2026-10-20)
 
 ## Sending Probes
 
