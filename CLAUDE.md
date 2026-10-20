@@ -314,6 +314,7 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 
 ## Git Conventions
 
-- **Author:** ZigZagBoi1 <marwantech2004@gmail.com>
+- **Author:** commit as the contributor doing the work (Rithik Janarthanan
+  <janarthananrithik@gmail.com>), never as the repository owner
 - **No AI attribution** in commits, PRs, or code.
 - Commit messages should be short and descriptive of what changed.
