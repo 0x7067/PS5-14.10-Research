@@ -38,12 +38,15 @@ This section scopes the current claims; older notes describe their cited probe s
 | Network packet injection | RAW socket + IP_HDRINCL, TCP connect-back with ARP responder |
 | sys 649 module member query | Returns userland addresses for member types 1-4, 7, 8 across module handles (no kernel pointers). Probe 54k, 2026-10-18 |
 | CClosure function redirect | Selected existing Lua C targets produced target-like outputs and restore checks (56c/56f); arbitrary target/ABI and ROP support remain unverified |
+| native.fcall_with_rax | Arbitrary userland function calls: getpid=0x22a, socket=0x16, close=0x0 confirmed (probe 129b) |
+| C11 threading (Thrd_create) | 5+ concurrent threads with join; Atomic_fetch_add_8 as thread entry verified (probes 126g/126h) |
+| UMTX_OP_SHM reachability | All sub-ops (create=1, destroy=4, alive=8) return 0 on syscall 454 (probe 151a). CVE-2024-43102 attack surface open |
 
 ### What's Blocked (Hard Walls)
 - **fn_addr/ROP execution is not demonstrated** — 45c undermines that earlier model for tested calls. Later selected CClosure redirects are separate userland evidence; neither identifies the complete syscall dispatcher
 - **W^X enforced** — `mmap(RWX)` gives RW only; `mprotect(EXEC)` always fails; mtypeprotect returns do not prove execute permissions or execution of the allocated test page
 - **Execute-only memory (XOM)** — system lib .text is XO (reading crashes); eboot is RX
-- **No threading (partially revised)** — `fork`, `rfork`, `thr_new` all blocked. `thr_create(430)` returns rv=0 with a real TID but panics the kernel (confirmed 14.10). Root cause (13.60 decompile, PRs #30/#31): `set_mcontext()` copies CS=0 from zeroed ucontext without forcing `SEL_RPL_MASK`; `ISPL(0)=0` makes the trap handler treat the child's fault as kernel-mode → `pcb_onfault==NULL` → `trap_fatal` → panic. **Hypothesis:** CS=0x43/SS=0x3B should prevent the panic and yield a live user-mode thread. Untested on 14.10 — probe 80a is the decisive test.
+- **Threading partially working** — `fork`, `rfork`, `thr_new` all blocked. **Thrd_create (C11 API) works** for 5+ threads with join. `thr_create(430)` with CS=0x43/SS=0x3B returns rv=-1 (thread not fully created) but **no kernel panic** (80a, 5 runs confirmed). With zeroed ucontext (CS=0), it panics as before. Root cause confirmed: `set_mcontext()` copies CS without forcing `SEL_RPL_MASK`. PS5 mcontext offsets: MC_RIP=0x90, MC_CS=0x98, MC_RSP=0xA8, MC_SS=0xB0 (all -0x10 from standard FreeBSD amd64).
 - **Sys 661 kills the process** — kills instantly on 14.10 for the two tested argument shapes (probes 54c and 54f section G, 2026-10-18). But both captures stop at 661, so 662-670 were never executed: the range-wide "AIO hard wall" is an n=1 generalization. See `docs/AIO_RANGE_14_10_EVIDENCE.md`.
 - **No kernel pointers found** — extensive scanning has found none. AF_ROUTE retest 53b confirmed kernel sanitizes route messages (zero kernel pointers). kldstat/kldsym (43a/43b) retest 53c never ran (connection refused). No KASLR defeat path identified.
 - **ROP-shaped metadata role is unknown** — tested calls persisted after selected fn_addr and chain mutations; do not treat the fields as a function-call primitive
@@ -253,6 +256,8 @@ docs/
 - **sys 671 resource class query** — sel=-1 mode=1: A=6144, B=3948. mode=2: A=2560, B=2014. Explicit selectors 0-10 all failed (needs credential bit 62). Memory budget values only. (probe 55e, 2026-10-18)
 - **sys 631** — instantly kills process. Lethal on 14.10. (probe 52a, 2026-10-18)
 - **sys 627-630** — all return PCALL-FAIL (exception/crash caught by pcall). (probe 52a, 2026-10-18)
+- **sys 677** — instantly kills process AND crashes the game (loader stops accepting connections). LETHAL + GAME CRASH. (syscall_isolation_sweep, 2026-10-20)
+- **sys 678** — instantly kills process AND crashes the game. Same behavior as 677. LETHAL + GAME CRASH. (syscall_isolation_sweep, 2026-10-20)
 
 ## Sending Probes
 
