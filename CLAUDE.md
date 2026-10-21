@@ -267,6 +267,7 @@ docs/
 - **R10 gadgets in eboot** — exhaustive 4.6MB scan: `pop r10;ret`, `mov r10,<any>;ret`, `xchg rax,r10;ret` — ALL not found. No way to set R10 from a ROP chain. Not needed: Sony's thr_create context sets R10 directly at +0x060. (probes 91l/91m, 2026-10-21)
 - **R10=0x090 for child syscalls** — FreeBSD standard mcontext offset for R10. Does NOT work on PS5 14.10; Sony uses syscall argument order instead. R10 is at +0x060. (probes 91g/91u, 2026-10-21)
 - **fd table race (close+dup2 vs sendmsg)** — dup/dup2 blocked on 14.10 (always -1). Without dup2, cannot atomically replace fd table entry. (probe 90a, 2026-10-21)
+- **CVE-2020-7457 (IPv6 2292PKTOPTIONS race)** — ALL RFC 2292 setsockopt options disabled on 14.10: opts 2,3,22,23,24,25 all return -1 on SET. The vulnerable ip6_pcbopts() path is unreachable. RFC 3542 options (PKTINFO=46, UNICAST_HOPS=4) work but survive 117-child close race (92e) — locking appears patched on both paths. (probes 92b/92c/92e, 2026-10-21)
 
 ## Sending Probes
 
@@ -305,8 +306,8 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - **Child thread 6-arg syscalls** (2026-10-21) — thr_create children can call any syscall with full 6 arguments via Sony's register layout (+0x060=R10, +0x068=R8). setsockopt confirmed. Enables threaded race conditions against kernel objects.
 
 **NEXT STEPS (Updated 2026-10-21):**
-1. **IPv6 setsockopt race (CVE-2020-7457 class)** — child threads can now call setsockopt with correct R10=0x060. Race setsockopt(IPV6_PKTINFO) teardown against concurrent close() for UAF on `in6p_outputopts`. This is the primary kernel exploit vector.
-2. **UMTX_OP mutex/rwlock/PI races (op 5/6/22 on 454)** — UMTX_OP_WAIT/WAKE/MUTEX are functional (56i2, 152k). The PI-mutex ops allocate `umtx_pi` objects and have had historical UAF/race bugs. Exercise the full op matrix (0-26) beyond 5/21.
+1. **Threaded socket/pipe races** — child threads with full 6-arg syscalls enable new race vectors. Target: close() vs sendmsg/recvmsg on same fd, socketpair+close races, pipe close races. The ip6_setpktopt race is patched but other socket ops may not be.
+2. **UMTX_OP PI-mutex races (op 5/6/22 on 454)** — UMTX_OP_WAIT/WAKE/MUTEX are functional (56i2, 152k). PI-mutex ops allocate `umtx_pi` objects with historical UAF/race bugs. Exercise the full op matrix (0-26) beyond 5/21.
 3. **56d ROP via CClosure** — redirect +0x20 to eboot gadgets (ret, pop rdi;ret, etc.) to build a gadget chain. Redirect rawequal/rawget to gadget addresses, call them, observe register/stack effects.
 4. **Threaded UMTX races** — use threads to race UMTX_OP_MUTEX_LOCK/UNLOCK for refcount or state corruption
 5. **Sysent 679-734 survey** — unexplored Sony syscall range beyond the lethal 677/678
