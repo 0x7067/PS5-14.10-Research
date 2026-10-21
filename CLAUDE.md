@@ -41,6 +41,7 @@ This section scopes the current claims; older notes describe their cited probe s
 | native.fcall_with_rax | Arbitrary userland function calls: getpid=0x22a, socket=0x16, close=0x0 confirmed (probe 129b) |
 | C11 threading (Thrd_create) | 5+ concurrent threads with join; Atomic_fetch_add_8 as thread entry verified (probes 126g/126h) |
 | UMTX_OP functional (op 5/21) | UMTX_OP_WAIT blocks correctly on value match; NWAKE_PRIVATE returns 0; MUTEX_LOCK writes owner TID (probes 56i2, 152k) |
+| Device inventory (34/76 nodes) | 34 of 76 `/dev` nodes open from game process (`gc`, `dce`, `ajm`, `dmem0`-`2`, `camera`, `usb`, `hid`, `bt`, `rng`, `gic`, `notification*`, HMD sets); ioctl reaches drivers, they reject commands. 32-bit dirent layout. Probes 259a-268a, PR #74 ng643, 2026-10-21 |
 
 ### What's Blocked (Hard Walls)
 - **fn_addr/ROP execution is not demonstrated** — 45c undermines that earlier model for tested calls. Later selected CClosure redirects are separate userland evidence; neither identifies the complete syscall dispatcher
@@ -272,6 +273,10 @@ docs/
 - **thr_get_ucontext(634)** — writes nothing for any arg shape even with alive child TID. (PR #71 ng643, 2026-10-21)
 - **blockpool_batch(657)** — returns status dword 0 only; still writes after close(h) but the write is worthless. (PR #71 ng643, 2026-10-21)
 - **query_memory_protection(547)** — userland-only VM lookup. All 32 kernel addresses return -1. No KASLR oracle. (PR #71 ng643, 2026-10-21)
+- **Device ioctl sweep (34 open /dev nodes)** — ioctl(54) reaches all 34 drivers but every command (0x00-0xFF with buffer, TIOCGETA, FIONBIO on dce) returns -1. Command encoding is not small integers; needs driver table from kernel image. (PR #74 ng643, 2026-10-21)
+- **AIO(661) with real fd** — `/dev/zero` fd + full aiocb struct still kills. Third argument shape to die there. Dead. (probe 266a, PR #74, 2026-10-21)
+- **UMTX ops 18-21 (high ops)** — all block unreadably; sentinel words untouched, blocked and returned threads indistinguishable. op 19 wrote 0x1 non-deterministically in one run. (probes 269a/270a, PR #74, 2026-10-21)
+- **WebKit popup isolation** — all popup methods (STATIC/BLANK/about:blank) kill WebProcess. Crash corpus must run inside single document. (PR #75 ng643, 2026-10-21)
 
 ## Sending Probes
 
@@ -313,7 +318,9 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 2. **Threaded UMTX PI-mutex races (op 5/6/22 on 454)** — UMTX_OP_WAIT/WAKE/MUTEX are functional (56i2, 152k). Thread budget is ≤8 children (PR #71). Use corrected parking pattern (`jmp $` gadget) to race MUTEX_LOCK/UNLOCK for refcount or state corruption.
 3. **56d ROP via CClosure** — redirect +0x20 to eboot gadgets (ret, pop rdi;ret, etc.) to build a gadget chain. Redirect rawequal/rawget to gadget addresses, call them, observe register/stack effects.
 4. **Sysent 679-734 survey** — unexplored Sony syscall range beyond the lethal 677/678
-5. **Remaining gaps** — syscalls 530–532/537 (PR #72 gap), probe 243a (thread slot reclaim, written not run), multi-flag EVF waiter races
+5. **Targeted device ioctl research** — 34 drivers reachable; `gc`, `dce`, `gic`, `camera`, `notification*` have kernel-facing code. Need Sony ioctl command codes from 13.60 Ghidra analysis, not blind sweeps. (PR #74 ng643)
+6. **Run JSC corpus (p172)** — 518 regression test cases targeting WebKit bugs fixed after Safari 17.0 branch. Guide browser engine is pre-17.0. Even one crash is a lead. (PR #75 ng643)
+7. **Remaining gaps** — syscalls 530–532/537 (PR #72 gap), probe 243a (thread slot reclaim, written not run), UMTX op 19 non-deterministic write repeat
 
 ## When Analyzing Results
 
@@ -328,5 +335,4 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - **Author:** commit as the contributor doing the work (Rithik Janarthanan
   <janarthananrithik@gmail.com>), never as the repository owner
 - **No AI attribution** in commits, PRs, or code.
-|Device inventory|34 of 76 `/dev` nodes open from a game process (`gc`, `dce`, `ajm`, `dmem0`-`2`, `camera`, `usb`, `hid`, `bt`, `rng`, `gic`, `notification*`, HMD sets); `ioctl` reaches the drivers and they return `-1` for unprobed commands. Probes 259a-263a, 2026-10-21|
 - Commit messages should be short and descriptive of what changed.
