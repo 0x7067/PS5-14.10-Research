@@ -198,7 +198,8 @@ docs/
 - **ioctl via resolve()** — all blocked (untested via make_syscall)
 - **sysctl kernel pointer leaks** — all scanned pointers are sentinels (0xFFFFFFFF_*)
 - **TCP_INFO** — 236 bytes, no kernel pointers
-- **minherit/msync** — outcomes unresolved: probe 38 ends at the minherit section header; 42b ends after the msync section prints its region address. Neither log records a call result or establishes a termination cause.
+- **minherit** — outcome unresolved: probe 38 ends at the minherit section header; no call result or termination cause recorded.
+- **msync via syscall 226** — 226 is a nosys stub. Real msync is syscall 65 (PR #70, DEM9N101). Earlier probes called dead air. Probe 58a corrected and queued.
 - **memfd_create** — stub, does nothing
 - **/dev/dmem0** — opens but all operations fail (GPU partition only)
 - **kenv** — outcome unverified: 42a/42g2 captures stop at the kenv header without a call result or kill record
@@ -261,12 +262,16 @@ docs/
 - **sys 678** — instantly kills process AND crashes the game. Same behavior as 677. LETHAL + GAME CRASH. (syscall_isolation_sweep, 2026-10-20)
 - **UMTX_OP_SHM (op 25 on syscall 454)** — **CONFIRMED STUB**: all sub-ops (create=1, destroy=4, alive=8) return 0 for any valid mapped address, -1 for unmapped addresses. Invalid sub-ops (0, 16) also return 0. Zero VM ops (sys 624 delta=0). alive() returns 0 even for never-created keys. No fd allocation, no vm_object creation, no slab allocation. Sony stubbed out the SHM subsystem. **CVE-2024-43102 is NOT exploitable** on 14.10 — the vulnerable umtx_shm_create_reg/unref_reg race path is unreachable. (probes 151a–152k, 2026-10-20)
 - **fstat(189) via make_syscall** — kills process immediately. (probe 152j, 2026-10-20)
+- **netcontrol(99) netevent queue UAF** — **CONFIRMED DEAD on 14.10**: register takes a socket reference; close-before-unregister leaks it instead of freeing. No double-free, no dangling pointer. The public Poops/ExploitNetControlImpl chain's precondition (close frees socket while registered) does not hold. ifindex -1 queue is permanently wedged. (probes 223a–234a, PR #69 ng643, 2026-10-21)
 - **jitshm (533 `jitshm_create`, 534 `jitshm_alias`)** — `533` returns -1 for sizes `0`, `0x1000`, `0x4000`, `0x100000` and flags `0`, `1`, `0xFFFFFFFF`, so no descriptor exists to alias; `534` returns -1 for a socket fd and for fd `0xFFFF`. `535 dl_get_list` and `536 dl_get_info` return -1 with a zeroed struct carrying only its size at `+0` and write nothing. (probe 251a, 2026-10-21)
 - **osem (549-556)** — `549 osem_create` returns -1 for eight scalar shapes (`0`, `1`, `2`, `0x10`, `(0,0)`, `(1,0)`, `(0,1)`, `(0x10,0,0)`) and for a NUL-terminated name pointer in either slot, so the family is unreachable and its wait/post/cancel calls were never exercised. (probes 252a, 253a, 2026-10-21)
 - **namedobj (557 `namedobj_create`, 558 `namedobj_delete`)** — `557(name)` returns a handle, but four calls on the *same* name return four distinct objects (`0x208`-`0x20B`), so the name is not a key and no lookup exists to aim at a freed object. `558` frees by handle (`0`), reissues the index (`0x220B`), and returns -1 for `0xDEAD` and `0`. (probe 254a, 2026-10-21)
 - **559 `set_vm_container`** — returns -1 for ids `0`-`8`, `0xF`, `0x100`, `0x7FFFFFFF`, `0x80000000`, `0xFFFFFFFE` and `0x100000000`; only `0xFFFFFFFF` returns `1` (the current container), and it changes nothing: mappings made before and after keep identical `547` records and mmap keeps allocating in the same region. (probes 255a/256a, 2026-10-21)
 - **560 `debug_init`** — `560(1)` returns `0` where `0`, `0x10`, `(0,0x10)` and `(0x1000,0x1000)` return -1, and it opens nothing: `656`, `593` mode 1, `634`, `mprotect` to RX and to RWX and `643` all answer exactly as they did before it. (probes 257a/258a, 2026-10-21)
 - **561 `suspend_process`** — kills the process at touch (`561(0)`), so `562 resume_process` was never reached. (probe 257a, 2026-10-21)
+- **thr_get_ucontext(634)** — writes nothing for any arg shape even with alive child TID. (PR #71 ng643, 2026-10-21)
+- **blockpool_batch(657)** — returns status dword 0 only; still writes after close(h) but the write is worthless. (PR #71 ng643, 2026-10-21)
+- **query_memory_protection(547)** — userland-only VM lookup. All 32 kernel addresses return -1. No KASLR oracle. (PR #71 ng643, 2026-10-21)
 
 ## Sending Probes
 
@@ -304,11 +309,11 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - **11 accessible Sony syscalls** — 596, 585, 572, 624, 563-566, 606, 643, 640
 
 **NEXT STEPS:**
-1. **UMTX_OP mutex/rwlock/PI races (op 5/6/22 on 454)** — UMTX_OP_WAIT/WAKE/MUTEX are functional (56i2, 152k). The PI-mutex ops allocate `umtx_pi` objects and have had historical UAF/race bugs. Exercise the full op matrix (0-26) beyond 5/21.
-2. **56d ROP via CClosure** — redirect +0x20 to eboot gadgets (ret, pop rdi;ret, etc.) to build a gadget chain. Redirect rawequal/rawget to gadget addresses, call them, observe register/stack effects.
-3. **Loader internals** — find the C-level syscall dispatch, check for writable function pointers
-4. **Threaded UMTX races** — Thrd_create works; use threads to race UMTX_OP_MUTEX_LOCK/UNLOCK for refcount or state corruption
-5. **Sysent 679-734 survey** — unexplored Sony syscall range beyond the lethal 677/678
+1. **★ Run probe 58a — msync(65) device-pager UAF (CVE-2026-49418)** — syscall number corrected from nosys 226 to real 65 (PR #70, DEM9N101). If msync(MS_INVALIDATE) returns 0 on GPU-mmap pages, the device-pager vulnerability path is reachable. **Highest priority test.**
+2. **Threaded UMTX PI-mutex races (op 5/6/22 on 454)** — UMTX_OP_WAIT/WAKE/MUTEX are functional (56i2, 152k). Thread budget is ≤8 children (PR #71). Use corrected parking pattern (`jmp $` gadget) to race MUTEX_LOCK/UNLOCK for refcount or state corruption.
+3. **56d ROP via CClosure** — redirect +0x20 to eboot gadgets (ret, pop rdi;ret, etc.) to build a gadget chain. Redirect rawequal/rawget to gadget addresses, call them, observe register/stack effects.
+4. **Sysent 679-734 survey** — unexplored Sony syscall range beyond the lethal 677/678
+5. **Remaining gaps** — syscalls 530–532/537 (PR #72 gap), probe 243a (thread slot reclaim, written not run), multi-flag EVF waiter races
 
 ## When Analyzing Results
 
