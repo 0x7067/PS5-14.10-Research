@@ -194,6 +194,10 @@ docs/
 
 ## Known Dead Ends (Don't Repeat These)
 
+- **The /system_tmp sockets** — `GnmCompositorRestricted`, `VrTracker2DomainSock` and `AgcCompositorSppSocket` accept a connection from the game's jail; the other four refuse on a fresh boot. The compositor protocol is `{u32 size; u32 command; ...}` in a message of at least 0x30 bytes, one request per connection, answered by `{u32 type=1; u32 flags; u32 payload_len; u32 status; payload}` for commands 0-6 (`0x80FF` for 7+); command 1 is the only one without `0x80D40009`, and nothing in the header except its size and the command word changes a reply. **Writing 8 KiB to a compositor socket stops the daemon listening until the game restarts and blacks the screen** (a loader relaunch with no console reboot brings them back) — an unprivileged DoS, no crash address and nothing reclaimed (361b-362b). Library `.rodata` is `p=0x1` and a read at `libSceNpGameIntent.sprx 0x4E8000` kills the process, so the client cannot be found and the rest of the protocol cannot be recovered (374a-377a). See `docs/SYSTEM_SOCKETS_14_10.md`.
+- **Module data is unreadable** — the 674 map shows module text `p=0x4`, `.rodata` `p=0x1`, writable data `p=0x3`. Only `p=0x3` and `p=0x5` (eboot text) can be read: a `.sprx` `p=0x1` region faults past `pcall` and takes the loader with it (377a). `memory.read_buffer` exists but does not change that.
+- **GPU device mappings** — `SceGnmTrapCode`/`TrapData`/`AgcDdid`/`EopFifo`/`ShadowRegInfo`/`Cwsr`/`Misc`/`AcqRb` (`p=0x33`) and `SceGnmDriver` (`p=0x10`) are mapped in the game process, but reading any of them kills the process past `pcall` (376a, 380a), and the write path swallows faults, so a store to an unmapped address also reports success (381a). No store into GPU memory can be confirmed and the ring cannot be driven blind.
+
 > Note (2026-10-17 evidence audit): entries marked inconclusive / "not established" reflect claim downgrades — see docs/EVIDENCE_AUDIT_2026-10-17.md.
 
 - **sigaltstack kernel write** — copyout() validates destinations
