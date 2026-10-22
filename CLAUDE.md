@@ -200,7 +200,7 @@ docs/
 - **mprotect(EXEC)** — always fails, hard W^X
 - **XOM gadget scan** — reading XO pages crashes past pcall
 - **Threading via resolve()** — fork/rfork/thr_new all -1. `thr_create(430)` via make_syscall starts a real thread once the gates and the `CS`/`RIP`/`RSP`/`SS` offsets are right (156c/156d); a zeroed ucontext still panics. See `docs/THREADING_ALIVE_14_10.md`.
-- **AIO (sys 661)** — instantly kills the process on 14.10 for the two tested argument shapes (probes 54c/54f, 2026-10-18). Scope correction: both captures terminate at 661, so 662-670 were never reached; the earlier range-wide verdict is unsupported. Use `tools/syscall_isolation_sweep.py` for one-connection-per-number measurement. See `docs/AIO_RANGE_14_10_EVIDENCE.md`.
+- **AIO (sys 661)** — instantly kills the process on 14.10 for the two tested argument shapes (probes 54c/54f, 2026-10-18). **661 is one entry, not the family**: the batch submit 669 works (`669(cmd, reqs, count 1..128, class 1..3, ids)`, stride `0x28`, `cmd=1` read / `cmd=2` write, result word = bytes moved, destination range-checked, count not clamped), with 662/664/666/662 driving and reaping the requests (probes 352a-352k, 2026-10-22). Read the result word, not the return value: 669 returns `0` even when it queued nothing. See `docs/AIO_BATCH_14_10.md`.
 - **kqueue** — fd allocates; kevent works with zero timeout (split and combined calls, probes 20/21), only the 100ms-timeout call returns -1 (probe 30c). See `docs/KEVENT_TIMEOUT_VARIABLE.md`.
 - **ioctl via resolve()** — all blocked (untested via make_syscall)
 - **sysctl kernel pointer leaks** — all scanned pointers are sentinels (0xFFFFFFFF_*)
@@ -284,6 +284,8 @@ docs/
 - **blockpool_batch(657)** — returns status dword 0 only; still writes after close(h) but the write is worthless. (PR #71 ng643, 2026-10-21)
 - **query_memory_protection(547)** — userland-only VM lookup. All 32 kernel addresses return -1. No KASLR oracle. (PR #71 ng643, 2026-10-21)
 - **Device ioctl sweep (34 open /dev nodes)** — ioctl(54) reaches all 34 drivers but every command (0x00-0xFF with buffer, TIOCGETA, FIONBIO on dce) returns -1. Command encoding is not small integers; needs driver table from kernel image. (PR #74 ng643, 2026-10-21)
+- **The GPU pool zeroes pages on allocation** — a dense scan of one complete 64 MiB chunk (8 388 608 qwords) and 49 152 samples across the 384 MiB a fresh process can map found zero nonzero words, zero kernel-shaped values and zero strings. The uninitialised-page KASLR leak is dead on 14.10, and the pool is never returned within a process (probe 348a, 2026-10-22).
+- **sys 637's store is inert** — the value lands at `child+0x280` and the call returns 0, but mapping three chunks, storing `0xFFFFFFFF` and mapping again reaches the same six-chunk GPU ceiling. Any earlier reading that attributed a ceiling change to the store was the pool already being consumed (probe 346b, 2026-10-22).
 - **AIO(661) with real fd** — `/dev/zero` fd + full aiocb struct still kills. Third argument shape to die there. Dead. (probe 266a, PR #74, 2026-10-21)
 - **UMTX ops 18-21 (high ops)** — all block unreadably; sentinel words untouched, blocked and returned threads indistinguishable. op 19 wrote 0x1 non-deterministically in one run. (probes 269a/270a, PR #74, 2026-10-21)
 - **WebKit popup isolation** — all popup methods (STATIC/BLANK/about:blank) kill WebProcess. Crash corpus must run inside single document. (PR #75 ng643, 2026-10-21)
