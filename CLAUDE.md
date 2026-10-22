@@ -194,13 +194,17 @@ docs/
 
 ## Known Dead Ends (Don't Repeat These)
 
+- **The /system_tmp sockets** — `GnmCompositorRestricted`, `VrTracker2DomainSock` and `AgcCompositorSppSocket` accept a connection from the game's jail; the other four refuse on a fresh boot. The compositor protocol is `{u32 size; u32 command; ...}` in a message of at least 0x30 bytes, one request per connection, answered by `{u32 type=1; u32 flags; u32 payload_len; u32 status; payload}` for commands 0-6 (`0x80FF` for 7+); command 1 is the only one without `0x80D40009`, and nothing in the header except its size and the command word changes a reply. **Writing 8 KiB to a compositor socket stops the daemon listening until the game restarts and blacks the screen** (a loader relaunch with no console reboot brings them back) — an unprivileged DoS, no crash address and nothing reclaimed (361b-362b). Library `.rodata` is `p=0x1` and a read at `libSceNpGameIntent.sprx 0x4E8000` kills the process, so the client cannot be found and the rest of the protocol cannot be recovered (374a-377a). See `docs/SYSTEM_SOCKETS_14_10.md`.
+- **Module data is unreadable** — the 674 map shows module text `p=0x4`, `.rodata` `p=0x1`, writable data `p=0x3`. Only `p=0x3` and `p=0x5` (eboot text) can be read: a `.sprx` `p=0x1` region faults past `pcall` and takes the loader with it (377a). `memory.read_buffer` exists but does not change that.
+- **GPU device mappings** — `SceGnmTrapCode`/`TrapData`/`AgcDdid`/`EopFifo`/`ShadowRegInfo`/`Cwsr`/`Misc`/`AcqRb` (`p=0x33`) and `SceGnmDriver` (`p=0x10`) are mapped in the game process, but reading any of them kills the process past `pcall` (376a, 380a), and the write path swallows faults, so a store to an unmapped address also reports success (381a). No store into GPU memory can be confirmed and the ring cannot be driven blind.
+
 > Note (2026-10-17 evidence audit): entries marked inconclusive / "not established" reflect claim downgrades — see docs/EVIDENCE_AUDIT_2026-10-17.md.
 
 - **sigaltstack kernel write** — copyout() validates destinations
 - **mprotect(EXEC)** — always fails, hard W^X
 - **XOM gadget scan** — reading XO pages crashes past pcall
 - **Threading via resolve()** — fork/rfork/thr_new all -1. `thr_create(430)` via make_syscall starts a real thread once the gates and the `CS`/`RIP`/`RSP`/`SS` offsets are right (156c/156d); a zeroed ucontext still panics. See `docs/THREADING_ALIVE_14_10.md`.
-- **AIO (sys 661)** — 661 is the shared `nosys` trampoline and dies by SIGSYS, not a hidden AIO handler (353a). The batch submit is **669**, and it works: descriptors, ids, poll/cancel/delete, both copy directions range-checked. Use `tools/syscall_isolation_sweep.py` for one-connection-per-number measurement. See `docs/AIO_BATCH_14_10.md`.
+- **AIO (sys 661)** — 661 is the shared `nosys` trampoline and dies by SIGSYS (353a). The batch submit is **669**, and it works: `669(cmd, reqs, count 1..128, class 1..3, ids)`, stride `0x28`, `cmd=1` read / `cmd=2` write, result word = bytes moved, destination range-checked, **count not clamped** (0x14000 into 4K kills via self-corruption). 662/664/666 drive and reap requests (probes 352a-352k, 2026-10-22). Read the result word, not the return value: 669 returns `0` even when it queued nothing. See `docs/AIO_BATCH_14_10.md`.
 - **kqueue** — fd allocates; kevent works with zero timeout (split and combined calls, probes 20/21), only the 100ms-timeout call returns -1 (probe 30c). See `docs/KEVENT_TIMEOUT_VARIABLE.md`.
 - **ioctl via resolve()** — all blocked (untested via make_syscall)
 - **sysctl kernel pointer leaks** — all scanned pointers are sentinels (0xFFFFFFFF_*)
@@ -285,6 +289,8 @@ docs/
 - **blockpool_batch(657)** — returns status dword 0 only; still writes after close(h) but the write is worthless. (PR #71 ng643, 2026-10-21)
 - **query_memory_protection(547)** — userland-only VM lookup. All 32 kernel addresses return -1. No KASLR oracle. (PR #71 ng643, 2026-10-21)
 - **Device ioctl sweep (34 open /dev nodes)** — ioctl(54) reaches all 34 drivers but every command (0x00-0xFF with buffer, TIOCGETA, FIONBIO on dce) returns -1. Command encoding is not small integers; needs driver table from kernel image. (PR #74 ng643, 2026-10-21)
+- **The GPU pool zeroes pages on allocation** — a dense scan of one complete 64 MiB chunk (8 388 608 qwords) and 49 152 samples across the 384 MiB a fresh process can map found zero nonzero words, zero kernel-shaped values and zero strings. The uninitialised-page KASLR leak is dead on 14.10, and the pool is never returned within a process (probe 348a, 2026-10-22).
+- **sys 637's store is inert** — the value lands at `child+0x280` and the call returns 0, but mapping three chunks, storing `0xFFFFFFFF` and mapping again reaches the same six-chunk GPU ceiling. Any earlier reading that attributed a ceiling change to the store was the pool already being consumed (probe 346b, 2026-10-22).
 - **AIO(661) with real fd** — `/dev/zero` fd + full aiocb struct still kills. Third argument shape to die there. Dead. (probe 266a, PR #74, 2026-10-21)
 - **UMTX ops 18-21 (high ops)** — all block unreadably; sentinel words untouched, blocked and returned threads indistinguishable. op 19 wrote 0x1 non-deterministically in one run. (probes 269a/270a, PR #74, 2026-10-21)
 - **WebKit popup isolation** — all popup methods (STATIC/BLANK/about:blank) kill WebProcess. Crash corpus must run inside single document. (PR #75 ng643, 2026-10-21)
