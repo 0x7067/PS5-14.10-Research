@@ -219,7 +219,7 @@ docs/
 - **kern.proc.filedesc/vmmap** — blocked (ret=-1)
 - **sysctl operations (43f)** — the write labeled `kern.securelevel` returned -1. Reads labeled `kern.coredump`, `security.bsd.unprivileged_proc_debug` and `kern.maxproc` returned -1, so their conditional writes were not reached. `kern.somaxconn` read returned 0/value 1024; no write was attempted. See `results/43f_sysctl_write_20261016_180756.txt`; these labels follow the probe's assumed MIB mappings.
 - **sysarch GET_GSBASE** — returns 0, no kernel pointer
-- **ioctl via make_syscall** — returns -1 for all tested codes
+- **ioctl via make_syscall** — the syscall works (FIOCLEX/FIONCLEX return 0 on every node, FIONBIO distinguishes `/dev/dce` from the simple devices), and the command space is now measured end to end: ~32 million calls over 31 nodes, every direction, the whole 14-bit length field. `/dev/dce` answers one inert 8-byte command (`0x80088209`); `/dev/gc` answers twenty-five struct-filling commands in group `0x81` (lengths 4-0x888) that write small constants and reject a null pointer. No command follows an address taken from the struct, none changes behaviour when the struct bytes change, and every write stays inside its declared length. One command, `0xC0048125`, blocks the calling thread forever (app renders, exit fails with a black screen). See `docs/DEVICE_IOCTL_14_10.md`; probes 273a-287a.
 - **dup/dup2 via make_syscall** — returns -1
 - **thr_new via make_syscall** — crashes process
 - **kern.msgbuf** — returns only 8 bytes (filtered)
