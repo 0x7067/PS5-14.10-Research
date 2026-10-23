@@ -228,7 +228,7 @@ docs/
 - **sysarch GET_GSBASE** — returns 0, no kernel pointer
 - **ioctl via make_syscall** — the syscall works (FIOCLEX/FIONCLEX return 0 on every node, FIONBIO distinguishes `/dev/dce` from the simple devices), and the command space is now measured end to end: ~32 million calls over 31 nodes, every direction, the whole 14-bit length field. `/dev/dce` answers one inert 8-byte command (`0x80088209`); `/dev/gc` answers twenty-five struct-filling commands in group `0x81` (lengths 4-0x888) that write small constants and reject a null pointer. No command follows an address taken from the struct, none changes behaviour when the struct bytes change, and every write stays inside its declared length. One command, `0xC0048125`, blocks the calling thread forever (app renders, exit fails with a black screen). See `docs/DEVICE_IOCTL_14_10.md`; probes 273a-287a.
 - **dup/dup2 via make_syscall** — returns -1
-- **thr_new via make_syscall** — crashes process
+- **thr_new via make_syscall** — WORKS (probe 383a); earlier "crashes process" was wrong. thr_create(430) also works (probes 156c/156d). Thread budget 25/11/9 per loader (242a/244a/245a)
 - **kern.msgbuf** — returns only 8 bytes (filtered)
 - **mincore KASLR oracle** — all kernel VA probes return -1
 - **sockopt overflow** — kernel clamps copy length, not exploitable
