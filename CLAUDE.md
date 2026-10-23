@@ -337,19 +337,22 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - **Syscall 624** — confirmed VM operation counter: +5 per mmap, stable (zero jitter over 100 samples), monotonic. Useful as side channel for counting kernel VM ops. (probe 52b)
 - **11 accessible Sony syscalls** — 596, 585, 572, 624, 563-566, 606, 643, 640
 
-**Closed vectors (details above in Dead Ends):**
+**Closed vectors (details in Dead Ends / docs/DEAD_ENDS.md):**
 - msync(65) device-pager UAF (CVE-2026-49418) — MS_INVALIDATE returns -1 on all mappings (58a/58b)
 - Sysent 679-734 — kernel-side credential gate, all return -1 even from child thread via sa (275b-275d)
 - Device ioctl research — ~32M calls across 31 nodes, zero exploitable commands (273a-287a)
+- UMTX PI mutex ownership fraud — DoS only (crash after 5-7 rounds, system hang), no kptr leak, no controlled write (160f-160j)
+- CVE-2026-58093 (tty race) — no /dev/tty* access (58d)
+- CVE-2026-58099 (kqueue fork race) — no fork() (58d)
+- CVE-2026-58090 (unix socket UAF) — FreeBSD 15.0+ only (58d)
+- AIO fd-close race — kernel fhold() prevents UAF (353b)
 
 **NEXT STEPS:**
-1. **★ Threaded UMTX PI-mutex races (op 5/6/22 on 454)** — UMTX_OP_WAIT/WAKE/MUTEX are functional (56i2, 152k). Thread budget is ≤8 children (PR #71). Use corrected parking pattern (`jmp $` gadget) to race MUTEX_LOCK/UNLOCK for refcount or state corruption.
+1. **★ AIO batch races (353c-353e)** — AIO is truly async (353a). fd-close is safe (353b). Remaining: cancel race (353c, written), result-pointer unmap after submit (353d), generation counter collision (353e). The async window is confirmed — race the completion path.
 2. **56d ROP via CClosure** — redirect +0x20 to eboot gadgets (ret, pop rdi;ret, etc.) to build a gadget chain. Redirect rawequal/rawget to gadget addresses, call them, observe register/stack effects.
 3. **Run JSC corpus (p172)** — 518 regression test cases targeting WebKit bugs fixed after Safari 17.0 branch. Guide browser engine is pre-17.0. Even one crash is a lead. (PR #75 ng643)
-4. **FreeBSD 2026 CVE reachability** — CVE-2026-58093 (tty TIOCSCTTY race), CVE-2026-58099 (kqueue copy-on-fork marker knote race), CVE-2026-58090 (unix socket receive-path UAF), CVE-2026-7270 (execve LPE). Probe `/dev/tty*` open and kqueue fork semantics from game process.
-5. **Routing socket info leak (Praetorian, unpatched upstream)** — defeats KASLR + stack canary on upstream FreeBSD. AF_ROUTE RTM_GET is reachable (53b returned sanitized data); the leak is a separate bug from the data path. Needs targeted probe.
-6. **Sony AIO race (probe 79c, never run)** — tests Relapse-style `aio_multi_wait(663)` vs `aio_submit_cmd(669)` race. AIO mode ledger has unresolved representation invariant in base-record branch.
-7. **Remaining gaps** — syscalls 530–532/537 (PR #72 gap), probe 243a (thread slot reclaim, written not run), UMTX op 19 non-deterministic write repeat
+4. **Routing socket info leak (Praetorian, unpatched upstream)** — defeats KASLR + stack canary on upstream FreeBSD. AF_ROUTE RTM_GET is reachable (53b returned sanitized data); the leak is a separate bug from the data path. Needs targeted probe.
+5. **Remaining gaps** — syscalls 530–532/537 (PR #72 gap), probe 243a (thread slot reclaim, written not run)
 
 ## When Analyzing Results
 
