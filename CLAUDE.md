@@ -312,6 +312,10 @@ docs/
 - **ioctl over-copy scan (/dev/gc, /dev/dce)** — all 23 data-returning `/dev/gc` group 0x81 commands and `/dev/dce` command `0x80088209` tested with 4KB sentinel-filled buffers. Zero bytes modified past declared length. Zero kernel pointers anywhere. The Praetorian ioctl is not in these two devices. (probe 56m, 2026-10-23)
 - **Thread ucontext kernel pointer scan** — sys 634 copies 0x4c0 bytes of a suspended child's registers. All 304 dwords scanned. Only userland addresses: eboot pointers, heap, stack. `0xFFFFFFFF` at `+0xA0` is the `-1` sentinel. Zero real kernel pointers. Confirms register layout (RDI=arg at +0x48, RIP at +0xE0). (probe 56n, 2026-10-23)
 - **getsockopt kernel pointer scan** — SOL_SOCKET (SO_TYPE/ERROR/SNDBUF/RCVBUF/LINGER/PEERLABEL/LISTENQ*), IPPROTO_TCP (NODELAY/MAXSEG/INFO/CONGESTION/CCALGOOPT/KEEP*/FUNCTION_BLK), LOCAL_PEERCRED. Only SO_LINGER(8B), TCP_INFO(236B), TCP_CONGESTION(8B) returned data. Zero kernel pointers, zero over-copy. (probe 56n, 2026-10-23)
+- **Unix socket SCM_CREDS credential leak** — `socketpair(AF_UNIX)` + `LOCAL_CREDS` setsockopt + sendmsg/recvmsg. Kernel attaches 40-byte `cmsgcred` (level=0xFFFF/SCM_CREDS=3): pid=0, uid=1, euid=1, gid=1, ngroups=1, groups[0]=1. All small integers, zero kernel pointers in data or padding. No uninitialized kernel stack leak via cmsg. (probe 56o, 2026-10-23)
+- **sigaction struct kernel pointer scan** — read old disposition for signals 1,2,10,12,14,17,20,30,31 via sigaction(416). All handler addresses are userland (0x73ECxxxx) or SIG_DFL(0). Signal mask fields are bitmasks (0xFFFEFEFF, 0xFFFFFFFF). No kernel pointers. (probe 56o section B, 2026-10-23)
+- **fstat deep scan + overcopy check** — fstat(189) on eboot.bin: standard 120-byte stat struct (dev=0x17, mode=0x816D, size=0x63192E, timestamps). Sentinel-filled 512-byte buffer — zero bytes modified past 120B. No overcopy, no kernel pointers. (probe 56o section C, 2026-10-23)
+- **getdirentries kernel pointer scan** — getdirentries(272) on /app0: 232 bytes of standard 32-bit dirent records (`.`, `..`, `movie`, etc). All inode numbers small (2-5). Zero kernel pointers in data or trailing padding. (probe 56o section D, 2026-10-23)
 
 ## Sending Probes
 
@@ -366,18 +370,24 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - Timing KASLR (mprotect batch + stability) — scheduling noise only (56h-56i2)
 - Syscalls 530/531/537 — all nosys stubs, return -1 with SIGSYS ignored, zero VM ops (56j)
 - mprotect ret=0 on kernel/unmapped addresses — early-return without VM map check; 547 confirms no protection change. W^X only rejects EXEC on mapped pages. No KASLR oracle, no write primitive. (56k)
+- Unix SCM_CREDS — clean, small integers only (56o)
+- sigaction structs — userland handlers + bitmasks only (56o)
+- fstat overcopy — no bytes past 120B stat, no kptrs (56o)
+- getdirentries — clean dirent records, no kptrs (56o)
 
 **NEXT STEPS:**
 1. **★ ioctl over-copy on remaining 32 devices** — `/dev/gc` and `/dev/dce` are clean (56m). Praetorian's leak is an unidentified Sony ioctl. The other 32 open nodes lack known command tables — need either brute-force group scan or a 14.10 kernel image to extract driver ioctl tables.
-2. **★ recvmsg SCM_CREDS / unix socket credential leak** — untested vector. `LOCAL_CREDS` socket option causes kernel to attach credential data to received messages; padding might contain uninitialized kernel stack data.
-3. **★ signal delivery frame scan** — when kernel delivers a signal, it pushes context onto user stack. If the frame contains more data than sys 634 exposes, padding might leak kernel pointers.
-4. **JSC corpus** — requires browser access mechanism from game process (not currently available)
+2. **★ getrusage padding scan** — `getrusage(117)` returns `struct rusage` (~128 bytes); FreeBSD has known padding between fields that may carry uninitialized kernel stack data.
+3. **★ SCM_TIMESTAMP / SO_TIMESTAMP ancillary data** — enable `SO_TIMESTAMP` on a socket, receive a packet, scan the cmsg for kernel pointers in timestamp padding.
+4. **★ procctl(544) output scan** — some procctl commands return data buffers; scan for kernel pointers.
+5. **JSC corpus** — requires browser access mechanism from game process (not currently available)
 
 **DONE (this session):**
 - thr_new(455) arg delivery confirmed (56l) — rdi=arg, gadget at eboot+0x92C67
 - ioctl over-copy scan /dev/gc + /dev/dce clean (56m)
 - ucontext + getsockopt kptr scan clean (56n)
 - Thread slot reclaim confirmed (243a) — 27 total spawns
+- SCM_CREDS + sigaction + fstat + getdirentries scan all clean (56o)
 
 ## When Analyzing Results
 
