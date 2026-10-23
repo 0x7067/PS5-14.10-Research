@@ -364,9 +364,9 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - mprotect ret=0 on kernel/unmapped addresses — early-return without VM map check; 547 confirms no protection change. W^X only rejects EXEC on mapped pages. No KASLR oracle, no write primitive. (56k)
 
 **NEXT STEPS:**
-1. **★ probe 243a** — thread slot reclaim, written not run
-2. **★ Routing socket Praetorian leak** — upstream FreeBSD KASLR + stack canary defeat via AF_ROUTE. The data path (53b) is sanitized, but the Praetorian leak is a separate info-leak bug. Needs targeted probe.
-3. **★ thr_new(455) real struct** — 383a showed it works with `param_size=0x38`. A real `thr_param` with `start_func` pointing to eboot code could give us a cleaner threading primitive than thr_create(430)
+1. **★ thr_new(455) real struct** — 56l written, awaiting PS5 reconnect. Tests arg delivery via `start_func(arg)` — if rdi=arg works, much cleaner threading than thr_create(430)
+2. **★ 243a thread slot reclaim** — DONE: 10 completed waiters + 17 new parkers = 27 total. Slots reclaim after waiter completion. Race experiments are not single-shot.
+3. **★ ioctl output buffer kernel pointer scan** — Praetorian's KASLR leak is an **unidentified ioctl over-copy**, not the routing socket data path. The specific ioctl is withheld/unpatched upstream. Our ioctl sweep (273a-287a) tested for exploitable commands, not info leaks in output buffers. `/dev/gc` group 0x81 returns data — worth re-scanning those 25 commands for kernel pointers in output.
 4. **JSC corpus** — requires browser access mechanism from game process (not currently available)
 
 ## When Analyzing Results
