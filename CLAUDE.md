@@ -360,12 +360,14 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - sys 624 side channel — no intra-kernel discrimination, all kernel addrs identical (56f)
 - Sysctl deep scan — zero kernel pointers in ALL CTL_* trees (56g3)
 - Timing KASLR (mprotect batch + stability) — scheduling noise only (56h-56i2)
+- Syscalls 530/531/537 — all nosys stubs, return -1 with SIGSYS ignored, zero VM ops (56j)
+- mprotect ret=0 on kernel/unmapped addresses — early-return without VM map check; 547 confirms no protection change. W^X only rejects EXEC on mapped pages. No KASLR oracle, no write primitive. (56k)
 
 **NEXT STEPS:**
-1. **★ Untested syscalls 530–532/537** — PR #72 gap. Never probed. Could have unexpected behavior or info leak.
-2. **★ mprotect ret=0 on kernel addresses** — 56f showed mprotect returns SUCCESS (ret=0) for kernel addresses with delta=1. Anomalous — FreeBSD should reject. Does it actually change kernel page permissions? Needs verification with sys 547 before/after.
-3. **JSC corpus** — requires browser access mechanism from game process (not currently available)
-4. **probe 243a** — thread slot reclaim, written not run
+1. **★ probe 243a** — thread slot reclaim, written not run
+2. **★ Routing socket Praetorian leak** — upstream FreeBSD KASLR + stack canary defeat via AF_ROUTE. The data path (53b) is sanitized, but the Praetorian leak is a separate info-leak bug. Needs targeted probe.
+3. **★ thr_new(455) real struct** — 383a showed it works with `param_size=0x38`. A real `thr_param` with `start_func` pointing to eboot code could give us a cleaner threading primitive than thr_create(430)
+4. **JSC corpus** — requires browser access mechanism from game process (not currently available)
 
 ## When Analyzing Results
 
