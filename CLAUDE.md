@@ -47,6 +47,12 @@ This section scopes the current claims; older notes describe their cited probe s
 | thr_new(455) with arg delivery | `start_func(arg)` where `arg` arrives in `rdi`. `struct thr_param` (0x38 bytes): start_func(+0), arg(+8), stack_base(+0x10), stack_size(+0x18), child_tid(+0x30). Much simpler than thr_create(430) ucontext. Gadget `mov [rdi],rax;ret` at eboot+0x92C67. Probe 56l, 2026-10-23 |
 | Child thread ROP syscalls (4-arg) | thr_new child with controlled stack executes arbitrary 4-arg syscalls via ROP. Full gadget catalog: pop_rax_ret(+0x992), pop_rdi_ret(+0xC9DFE), pop_rsi_ret(+0xD77D), pop_rdx_ret(+0x3B02D7), pop_rcx_ret(+0xE64), pop_rdi_rbp_ret(+0x169), pop_rsi_rbp_ret(+0x78), bare_ret(+0x42). No pop_r8/r9 found — max 4 args. RSP = ((stack_base + stack_size) & ~0xF) - 8. Probes 271g/272a, 2026-10-23 |
 | EVFILT_TIMER + socketpair | kqueue(362) + kevent(363) with EVFILT_TIMER(-7) works at 1ms resolution. AF_UNIX socketpair (SOCK_DGRAM) works: write/kevent pipeline confirmed. Probe 271i, 2026-10-23 |
+| Child thread fake TCB fix | fn_addr stub error path accesses `%fs:0` for errno — child without TLS crashes on ANY failing syscall. Fix: prepend `sysarch(SET_FSBASE=129, &fake_tcb)` to child ROP chain. Fake TCB = 4KB self-referencing pointer buffer. After fix, `close(-1)` returns -1 normally, sysctl returns -1 (EFAULT). Probe 384b, 2026-10-23 |
+| Child multi-arg confirmed | getpid(0-arg)=pid, write(3-arg)=8 bytes via socketpair, socketpair(4-arg)=ret 0 fds created — all from child thread. sysctl(6-arg) fails EFAULT: r8/r9 NOT zeroed at child entry. No mov_r8/xor_r8d gadgets in 4.6MB eboot (386a). Max controlled: 4 args. Probes 384b/386a, 2026-10-23 |
+| Concurrent child races clean | Double-close (100 iter), UMTX trylock (50×4), socket write+close (50 iter) — zero kernel pointers, zero anomalies, zero corruption. fd table lock solid. UMTX trylock(op 6) always returns -1 from child (may need full umutex struct or unsupported). Probe 385a, 2026-10-23 |
+| POSIX shm (shm_open/ftruncate/mmap) | shm_open(482) works: SHM_ANON, named objects, O_CREAT\|O_RDWR, ftruncate, mmap(MAP_SHARED). sendfile(393) on shm fds sends 16KB/page with interleaved drain. shm_open2(571) is nosys — no largepage objects. Probes 391a-391d, 2026-10-23 |
+| mlock(203) heap pages | mlock returns 0 on heap pages — prevents paging, ensures residency. munlock(204) also works. Probe 392f, 2026-10-23 |
+| stat(188) filesystem enumeration | stat works on /, /dev, /dev/*, /app0, /app0/*, /system_tmp. mode=0x0000 everywhere (Sony zeroes). Other paths (/system, /data, /proc, /tmp) return -1. Probe 392f, 2026-10-23 |
 
 ### What's Blocked (Hard Walls)
 - **fn_addr/ROP execution is not demonstrated** — 45c undermines that earlier model for tested calls. Later selected CClosure redirects are separate userland evidence; neither identifies the complete syscall dispatcher
@@ -404,11 +410,17 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - Signal delivery frame (sendsig) — frame zero-initialized, no kptrs (56r)
 - Eboot syscall scan — 18 hits, zero syscall;ret in eboot, but fn_addr ROP works (56s, superseded by 271g)
 - Kqueue race (ZDI-26-784) — 10,000+ races across 4 variants, 0 anomalies, kernel locking solid (271g/271h/271i)
+- **Ioctl overcopy full sweep — ALL 34 /dev nodes clean** (387a/387c): 48,446 calls (256 groups × 5 sizes × 2 dirs) across 19 non-catch-all, non-gc/dce devices. Only hit: `/dev/usbctl` group 0x51 (cmds 0x00/0x01, USB descriptor "HID_IGNORE"), all within declared bounds. Combined with gc/dce (56m), ugen0.2 (387a), catch-all devices (387a): zero overcopy, zero kernel pointers on any accessible device. The Praetorian KASLR ioctl is not reachable from the game process.
+- **CVE-2026-49427/49428 (posixshm largepage UAF)** — **CONFIRMED DEAD**: shm_open2(571) is a nosys stub, so largepage shm objects cannot be created. shm_open(482) works (named, SHM_ANON, ftruncate, mmap), sendfile(393) works on shm fds (16KB/page with interleaved drain), but SF_NOCACHE has no effect because make_syscall passes max 6 args (7th=flags doesn't reach kernel). O_TRUNC properly zeroes all pages. fspacectl(580) absent. FIOSSHMLPGCNF ioctl returns -1 on all shm sizes. The vulnerable largepage code paths are entirely unreachable. (probes 391a-391d, 2026-10-23)
+- **CVE-2026-49419 (jail refcount underflow)** — jail(338), jail_get(506), jail_set(507), jail_remove(508) all return -1. Likely FreeBSD 15.0+ only. (probe 392a, 2026-10-23)
+- **FatGid/setcred (CVE-2026-45250)** — syscall 591 is in the Sony range and returns -1 (not crash). setcred was added in FreeBSD 14.3; PS5 kernel is FreeBSD 11-based. Not present. (probe 392a, 2026-10-23)
+- **CVE-2026-58094 (ZDI-26-785, FIOSSHMLPGCNF TOCTOU)** — ioctl on shm fd returns -1 for all size variants. Requires largepage infrastructure which is absent. (probe 392a, 2026-10-23)
+- **BSD-native syscall range (1-530) exhausted** (388a-392f, 2026-10-23): ~400 syscalls tested across probes 388a-389i (phase 18) and 392a-392f (phase 20). sc102 returns 160B socket info, sc125 returns 160B interface data — both zero kernel pointers. fstatfs/getfsstat/statfs all blocked. 40 unnamed slots (91,94,119,151-153,etc) all -1 for three arg patterns. modfind/modnext/modfnext blocked. ktimer create/settime accept but gettime/delete fail (stubs). stat shows /, /dev/*, /app0/*, /system_tmp visible (mode=0x0000 everywhere). socketclose(114) works as alt close. sched_getparam returns prio=700 (Sony custom). getlogin="root". profil accepts but writes 0 samples. ptrace/rfork/minherit/cpuset/audit all blocked. **Zero kernel pointers found across the entire BSD-native range.**
 
 **NEXT STEPS:**
-1. **★ ioctl brute-force on remaining 32 devices** — The Praetorian KASLR leak is an unidentified Sony ioctl over-copy. `/dev/gc` and `/dev/dce` are clean (56m). The other 32 open nodes lack known command tables. Need group-scan approach: for each device, sweep ioctl codes `0xC0xx_GG00`–`0xC0xx_GGFF` for group IDs 0x00-0xFF, checking which return 0 instead of -1, then scan those output buffers for kernel pointers. This is the last viable KASLR vector that doesn't require a kernel image.
-2. **★ Kernel image acquisition** — without a 14.10 kernel dump, we can't identify the Praetorian ioctl device/command, verify sysent layout, or find new attack surface. Investigate if any accessible syscall or device node can copy kernel .text (e.g. debug stubs, coredump paths, unknown 13.60 syscalls that might work differently on 14.10).
-3. **JSC corpus** — requires browser access mechanism from game process (not currently available)
+1. **★ Kernel image acquisition** — without a 14.10 kernel dump, we can't identify the Praetorian ioctl device/command (may require credentials the game lacks), verify sysent layout, or find new attack surface. Investigate if any accessible syscall or device node can copy kernel .text (e.g. debug stubs, coredump paths, unknown 13.60 syscalls that might work differently on 14.10).
+2. **JSC corpus** — requires browser access mechanism from game process (not currently available)
+3. **Revisit 13.60 dossier for undiscovered Sony syscall arg shapes** — the Sony range (532-676) is largely exhausted but a few handlers (604, 636) have no decoded contract. New arg patterns from deeper decompilation might unlock handlers that returned -1 to generic args.
 
 **DONE (this session):**
 - thr_new(455) arg delivery confirmed (56l) — rdi=arg, gadget at eboot+0x92C67
@@ -423,6 +435,14 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - **Child thread ROP syscalls confirmed (271g)** — close(fd) via ROP chain on child stack. Gadgets: pop_rax_ret at eboot+0x992, pop_rdi_rbp_ret at +0x169
 - EVFILT_TIMER + socketpair pipeline verified (271i) — kqueue works with timers and AF_UNIX
 - Kqueue race exhausted (271g/271h/271i) — 10,000+ races, 0 anomalies, ZDI-26-784 dead on 14.10
+- Child thread fake TCB fix (384b) — sysarch(SET_FSBASE=129) with self-referencing 4KB buffer
+- Child multi-arg confirmed (384b/386a) — getpid(0-arg), write(3-arg), socketpair(4-arg) from child. No r8/r9 gadgets in 4.6MB eboot — max 4 controlled args
+- Concurrent child races clean (385a) — double-close, UMTX trylock, socket write+close: 0 anomalies
+- **Ioctl overcopy full sweep COMPLETE (387a/387c)** — all 34 /dev nodes clean. usbctl group 0x51 only hit (USB descriptor, no overcopy). Praetorian KASLR ioctl not accessible from game process
+- CVE-2026-49427/49428 posixshm largepage UAF DEAD (391a-391d) — shm_open2(571) is nosys, largepage objects unreachable
+- CVE-2026-49419 jail refcount DEAD (392a) — all jail syscalls -1
+- FatGid/setcred DEAD (392a) — syscall 591 is Sony, not FreeBSD setcred
+- **BSD-native range (1-530) EXHAUSTED (388a-392f)** — zero kernel pointers across ~400 tested syscalls. sc102/sc125 return data but all userland. 40 unnamed slots dead. fstatfs/getfsstat/mod* all blocked
 
 ## When Analyzing Results
 
