@@ -324,6 +324,8 @@ docs/
 - **SCM_RIGHTS fd passing** — unix socketpair sendmsg with SCM_RIGHTS succeeds (ret=4) but recvmsg returns controllen=0: kernel strips fd-passing ancillary data in the game jail. No cmsg to scan. (probe 56q section B, 2026-10-23)
 - **sendfile error path data leak** — sendfile(393) returns -1 on unconnected TCP socket. sbytes output pointer left completely unmodified (sentinel intact). No partial write, no kernel stack data leak on error. (probe 56q section C, 2026-10-23)
 - **poll output overcopy** — poll(209) on UDP socket with zero timeout. revents=0, zero bytes modified past 8-byte pollfd struct. (probe 56q section D, 2026-10-23)
+- **Signal delivery frame (sendsig) kernel stack residue** — sigframe is 2128 bytes (0x850), 486 modified dwords, all zeros and userland addresses. sendsig() zero-initializes the frame. No kernel pointers in padding. (probe 56r, 2026-10-23)
+- **Eboot syscall instruction scan** — full 4.6MB .text scanned for 0F 05. 18 hits, all in data/immediates, zero followed by C3 (ret). No syscall;ret gadget exists in eboot. Child threads cannot make kernel calls via ROP. TOCTOU race conditions requiring concurrent syscalls are impossible from this sandbox. (probe 56s, 2026-10-23)
 
 ## Sending Probes
 
@@ -390,6 +392,8 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - SCM_RIGHTS — kernel strips fd passing in game jail (56q)
 - sendfile error path — sbytes untouched on failure (56q)
 - poll — no overcopy past pollfd (56q)
+- Signal delivery frame (sendsig) — frame zero-initialized, no kptrs (56r)
+- Eboot syscall scan — 18 hits, zero syscall;ret, no child syscall capability (56s)
 
 **NEXT STEPS:**
 1. **★ ioctl brute-force on remaining 32 devices** — The Praetorian KASLR leak is an unidentified Sony ioctl over-copy. `/dev/gc` and `/dev/dce` are clean (56m). The other 32 open nodes lack known command tables. Need group-scan approach: for each device, sweep ioctl codes `0xC0xx_GG00`–`0xC0xx_GGFF` for group IDs 0x00-0xFF, checking which return 0 instead of -1, then scan those output buffers for kernel pointers. This is the last viable KASLR vector that doesn't require a kernel image.
@@ -404,6 +408,8 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - SCM_CREDS + sigaction + fstat + getdirentries scan all clean (56o)
 - getrusage + SO_TIMESTAMP + procctl + getrlimit scan all clean (56p)
 - kevent + SCM_RIGHTS + sendfile + poll scan all clean/blocked (56q)
+- Signal frame (sendsig) scan clean (56r) — 2128B frame, all userland
+- Full eboot syscall scan: 18 hits, zero syscall;ret confirmed (56s)
 
 ## When Analyzing Results
 
