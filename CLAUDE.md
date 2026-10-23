@@ -316,6 +316,10 @@ docs/
 - **sigaction struct kernel pointer scan** — read old disposition for signals 1,2,10,12,14,17,20,30,31 via sigaction(416). All handler addresses are userland (0x73ECxxxx) or SIG_DFL(0). Signal mask fields are bitmasks (0xFFFEFEFF, 0xFFFFFFFF). No kernel pointers. (probe 56o section B, 2026-10-23)
 - **fstat deep scan + overcopy check** — fstat(189) on eboot.bin: standard 120-byte stat struct (dev=0x17, mode=0x816D, size=0x63192E, timestamps). Sentinel-filled 512-byte buffer — zero bytes modified past 120B. No overcopy, no kernel pointers. (probe 56o section C, 2026-10-23)
 - **getdirentries kernel pointer scan** — getdirentries(272) on /app0: 232 bytes of standard 32-bit dirent records (`.`, `..`, `movie`, etc). All inode numbers small (2-5). Zero kernel pointers in data or trailing padding. (probe 56o section D, 2026-10-23)
+- **getrusage padding scan** — getrusage(117) for RUSAGE_SELF and RUSAGE_THREAD. FreeBSD struct is 144 bytes (not 128) — the +0x80..+0x8C "overcopy" is actually `ru_ixrss`/`ru_idrss` fields. All values are resource counters. Zero kernel pointers. No actual overcopy past 144B. (probe 56p section A, 2026-10-23)
+- **SO_TIMESTAMP / SO_BINTIME ancillary data** — UDP loopback with both `SO_TIMESTAMP(0x400)` and `SO_BINTIME(0x2000)` enabled. Kernel attached two 32-byte cmsgs: SCM_BINTIME (sec+frac) and SCM_TIMESTAMP (timeval). All fields are valid timestamps, frac bytes are precise binary fraction. Zero kernel pointers. (probe 56p section B, 2026-10-23)
+- **procctl(544) output scan** — all 7 status commands (REAP_STATUS, TRAPCAP, ASLR, STACKGAP, NO_NEW_PRIVS, WXMAP, PDEATHSIG) return -1 with zero bytes written. Completely blocked for game process. (probe 56p section C, 2026-10-23)
+- **getrlimit overcopy + kptr scan** — 12 resource types tested. Non-infinite limits: MEMLOCK=32GiB, SBSIZE=2MiB, NOFILE=1604, NPROC=13952. Zero overcopy past 16-byte struct rlimit. Zero kernel pointers. (probe 56p section D, 2026-10-23)
 
 ## Sending Probes
 
@@ -374,12 +378,16 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - sigaction structs — userland handlers + bitmasks only (56o)
 - fstat overcopy — no bytes past 120B stat, no kptrs (56o)
 - getdirentries — clean dirent records, no kptrs (56o)
+- getrusage — 144B struct, all resource counters, no kptrs (56p)
+- SO_TIMESTAMP + SO_BINTIME — valid timestamps, no kptrs (56p)
+- procctl — all 7 status cmds blocked (ret=-1) (56p)
+- getrlimit — standard limits, no overcopy, no kptrs (56p)
 
 **NEXT STEPS:**
 1. **★ ioctl over-copy on remaining 32 devices** — `/dev/gc` and `/dev/dce` are clean (56m). Praetorian's leak is an unidentified Sony ioctl. The other 32 open nodes lack known command tables — need either brute-force group scan or a 14.10 kernel image to extract driver ioctl tables.
-2. **★ getrusage padding scan** — `getrusage(117)` returns `struct rusage` (~128 bytes); FreeBSD has known padding between fields that may carry uninitialized kernel stack data.
-3. **★ SCM_TIMESTAMP / SO_TIMESTAMP ancillary data** — enable `SO_TIMESTAMP` on a socket, receive a packet, scan the cmsg for kernel pointers in timestamp padding.
-4. **★ procctl(544) output scan** — some procctl commands return data buffers; scan for kernel pointers.
+2. **★ pipe2/socketpair fd-in-cmsg overcopy** — SCM_RIGHTS (fd passing) through unix socketpair: the cmsg may carry more data than the fd array. Scan padding around passed fds.
+3. **★ sendfile(393) error path data leak** — sendfile copies between kernel objects; even if it returns -1, it may have partially initialized an output struct (sf_hdtr) that leaks stack data.
+4. **★ kevent output scan** — kevent returns structs with `udata` and `data` fields; those come from kernel and may contain addresses if the filter populates them from kernel state.
 5. **JSC corpus** — requires browser access mechanism from game process (not currently available)
 
 **DONE (this session):**
@@ -388,6 +396,7 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - ucontext + getsockopt kptr scan clean (56n)
 - Thread slot reclaim confirmed (243a) — 27 total spawns
 - SCM_CREDS + sigaction + fstat + getdirentries scan all clean (56o)
+- getrusage + SO_TIMESTAMP + procctl + getrlimit scan all clean (56p)
 
 ## When Analyzing Results
 
