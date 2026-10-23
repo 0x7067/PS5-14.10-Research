@@ -37,7 +37,8 @@ This section scopes the current claims; older notes describe their cited probe s
 | eboot gadget catalog | Readable candidate bytes; 56e records nil gadget-test returns, but no working general ROP chain is established |
 | Network packet injection | RAW socket + IP_HDRINCL, TCP connect-back with ARP responder |
 | sys 649 module member query | Returns userland addresses for member types 1-4, 7, 8 across module handles (no kernel pointers). Probe 54k, 2026-10-18 |
-| CClosure function redirect | Selected existing Lua C targets produced target-like outputs and restore checks (56c/56f); arbitrary target/ABI and ROP support remain unverified |
+| CClosure function redirect | Selected existing Lua C targets produced target-like outputs and restore checks (56c/56f); eboot gadget execution confirmed via +0x20 redirect (56d-56d7); arbitrary native-register argument control and ROP chain remain unverified |
+| Eboot gadget catalog (rax=N) | rax=0 (+0x471), rax=1 (+0x1AB0C6), rax=6 (+0xCEF50), rax=7 (+0xDBF50), rax=8 (+0x8D2D4); no rax=2,3,4,5 in 1.5MB scan. Gadgets control Lua return count for stack reads (probes 56d5-56d7) |
 | native.fcall_with_rax | Arbitrary userland function calls: getpid=0x22a, socket=0x16, close=0x0 confirmed (probe 129b) |
 | C11 threading (Thrd_create) | 5+ concurrent threads with join; Atomic_fetch_add_8 as thread entry verified (probes 126g/126h) |
 | UMTX_OP functional (op 5/21) | UMTX_OP_WAIT blocks correctly on value match; NWAKE_PRIVATE returns 0; MUTEX_LOCK writes owner TID (probes 56i2, 152k) |
@@ -301,6 +302,9 @@ docs/
 - **AIO(661) with real fd** — `/dev/zero` fd + full aiocb struct still kills. Third argument shape to die there. Dead. (probe 266a, PR #74, 2026-10-21)
 - **UMTX ops 18-21 (high ops)** — all block unreadably; sentinel words untouched, blocked and returned threads indistinguishable. op 19 wrote 0x1 non-deterministically in one run. (probes 269a/270a, PR #74, 2026-10-21)
 - **WebKit popup isolation** — all popup methods (STATIC/BLANK/about:blank) kill WebProcess. Crash corpus must run inside single document. (PR #75 ng643, 2026-10-21)
+- **NET_RT_DUMP kernel pointer search** — 4968 bytes, 17 routing messages. 5 values matched kernel pointer pattern (`0xFFFF8xxx+`) at non-aligned offsets. Full hexdump (56e2) proved ALL are false positives: sockaddr boundary crossings where netmask `FF FF FF` bytes combine with adjacent sockaddr `sa_len`/`sa_family` fields. Padding after sockaddr_in6 is `0xFF` (not zeroed) but contains no real kernel addresses. RTM_GET is deterministic (10 calls, zero varying bytes). (probes 56e/56e2, 2026-10-23)
+- **CVE-2026-3038 sa_len=127 routing socket overflow** — sa_len=127 write accepted (279 bytes), kernel returned normal 272-byte response without panic. Either Sony patched the `rtsock_msg_buffer()` validation (build Sep 2026, fix Feb 2026) or the overflow doesn't reach the stack canary for this code path. (probe 56e section F, 2026-10-23)
+- **CClosure deep Lua stack read** — rax=0,1,6,7,8 gadgets found in eboot (no rax=2,3,4,5 in 1.5MB scan). rax=N redirected rawequal reads N values from Lua stack: args, function objects, caller local variables. rax=8 with 0 args reads caller's `nret` and `args_str` locals. ALL values are userland heap objects (0x310xxxxxxx) or eboot pointers (0x532xxxxxxx). Zero kernel pointers in the Lua stack. (probes 56d5-56d7, 2026-10-23)
 
 ## Sending Probes
 
@@ -317,9 +321,9 @@ python tools/run_session40.py --ps5-ip YOUR_PS5_IP --fake-ip YOUR_TEST_HOST_IP
 
 Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 
-## Current Attack Priority (Updated 2026-10-18 — post-55g results)
+## Current Attack Priority (Updated 2026-10-23 — post-56e2 results)
 
-**Evidence update:** Phase 14 (54a–55g) examined KASLR candidates, Sony syscalls, and device control paths. The examined paths have not established a kernel base, including the tested AF_ROUTE, RDMSR, sys 674 VM map, sys 649 module member, kinfo_proc and net.route.iflistl paths. These results do not establish that every possible KASLR technique is unavailable. Sys 661 kills; the rest of 662-670 is unmeasured. sys 622/601/548 are dead.
+**Evidence update:** Phase 14 (54a–55g) and phase 15 (56d-56e2) examined KASLR candidates, CClosure gadgets, and routing socket paths. NET_RT_DUMP "kernel pointers" are proven false positives (sockaddr boundary artifacts). CVE-2026-3038 sa_len=127 accepted without panic. CClosure deep stack reads yield only userland. No KASLR defeat path identified. native.fcall_with_rax provides arbitrary userland function calls.
 
 **CClosure +0x20: target bytes, write boundaries and later returned effects:**
 - 55g wrote +1 to type()'s +0x20 low dword; output changes to binary after the write marker. The executed instruction and termination cause are not identified by that capture. Section D records same-value/no-op writes at +0x00, +0x08, +0x10, +0x18, +0x28 and +0x30. Sections E/F record different-value writes only at +0x18 and +0x00, followed by restoration; those operations returned without a recorded behavioral change.
@@ -346,13 +350,16 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - CVE-2026-58099 (kqueue fork race) — no fork() (58d)
 - CVE-2026-58090 (unix socket UAF) — FreeBSD 15.0+ only (58d)
 - AIO fd-close race — kernel fhold() prevents UAF (353b)
+- AIO batch races (cancel, unmap, gen counter) — all safe (353c-353e)
+- NET_RT_DUMP kernel pointer search — all false positives, sockaddr boundary artifacts (56e/56e2)
+- CVE-2026-3038 sa_len=127 routing overflow — accepted without panic, likely patched (56e)
+- CClosure deep Lua stack read — only userland pointers, zero kernel addresses (56d5-56d7)
 
 **NEXT STEPS:**
-1. **★ AIO batch races (353c-353e)** — AIO is truly async (353a). fd-close is safe (353b). Remaining: cancel race (353c, written), result-pointer unmap after submit (353d), generation counter collision (353e). The async window is confirmed — race the completion path.
-2. **56d ROP via CClosure** — redirect +0x20 to eboot gadgets (ret, pop rdi;ret, etc.) to build a gadget chain. Redirect rawequal/rawget to gadget addresses, call them, observe register/stack effects.
-3. **Run JSC corpus (p172)** — 518 regression test cases targeting WebKit bugs fixed after Safari 17.0 branch. Guide browser engine is pre-17.0. Even one crash is a lead. (PR #75 ng643)
-4. **Routing socket info leak (Praetorian, unpatched upstream)** — defeats KASLR + stack canary on upstream FreeBSD. AF_ROUTE RTM_GET is reachable (53b returned sanitized data); the leak is a separate bug from the data path. Needs targeted probe.
-5. **Remaining gaps** — syscalls 530–532/537 (PR #72 gap), probe 243a (thread slot reclaim, written not run)
+1. **★ Run JSC corpus (p172)** — 518 regression test cases targeting WebKit bugs fixed after Safari 17.0 branch. Guide browser engine is pre-17.0. Even one crash is a lead. (PR #75 ng643)
+2. **Syscall timing side channels via sys 624** — 624 counts VM ops (+5 per mmap). If a kernel operation's VM op count varies based on address-space layout, it leaks KASLR bits. Need to find a syscall whose VM op count depends on kernel state.
+3. **native.fcall_with_rax for KASLR** — we can call arbitrary userland functions. If libkernel exports a function that leaks kernel info (e.g., through error paths, timing), this is the way to reach it. Systematic scan of libkernel/libc exported symbols needed.
+4. **Remaining gaps** — syscalls 530–532/537 (PR #72 gap), probe 243a (thread slot reclaim, written not run)
 
 ## When Analyzing Results
 
