@@ -320,6 +320,10 @@ docs/
 - **SO_TIMESTAMP / SO_BINTIME ancillary data** — UDP loopback with both `SO_TIMESTAMP(0x400)` and `SO_BINTIME(0x2000)` enabled. Kernel attached two 32-byte cmsgs: SCM_BINTIME (sec+frac) and SCM_TIMESTAMP (timeval). All fields are valid timestamps, frac bytes are precise binary fraction. Zero kernel pointers. (probe 56p section B, 2026-10-23)
 - **procctl(544) output scan** — all 7 status commands (REAP_STATUS, TRAPCAP, ASLR, STACKGAP, NO_NEW_PRIVS, WXMAP, PDEATHSIG) return -1 with zero bytes written. Completely blocked for game process. (probe 56p section C, 2026-10-23)
 - **getrlimit overcopy + kptr scan** — 12 resource types tested. Non-infinite limits: MEMLOCK=32GiB, SBSIZE=2MiB, NOFILE=1604, NPROC=13952. Zero overcopy past 16-byte struct rlimit. Zero kernel pointers. (probe 56p section D, 2026-10-23)
+- **kevent output scan** — kqueue(362) + kevent(363) with EVFILT_READ on socket and EVFILT_TIMER. Both return 0 events with zero timeout. No data written to output buffer. (probe 56q section A, 2026-10-23)
+- **SCM_RIGHTS fd passing** — unix socketpair sendmsg with SCM_RIGHTS succeeds (ret=4) but recvmsg returns controllen=0: kernel strips fd-passing ancillary data in the game jail. No cmsg to scan. (probe 56q section B, 2026-10-23)
+- **sendfile error path data leak** — sendfile(393) returns -1 on unconnected TCP socket. sbytes output pointer left completely unmodified (sentinel intact). No partial write, no kernel stack data leak on error. (probe 56q section C, 2026-10-23)
+- **poll output overcopy** — poll(209) on UDP socket with zero timeout. revents=0, zero bytes modified past 8-byte pollfd struct. (probe 56q section D, 2026-10-23)
 
 ## Sending Probes
 
@@ -382,13 +386,15 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - SO_TIMESTAMP + SO_BINTIME — valid timestamps, no kptrs (56p)
 - procctl — all 7 status cmds blocked (ret=-1) (56p)
 - getrlimit — standard limits, no overcopy, no kptrs (56p)
+- kevent — no events returned, nothing written (56q)
+- SCM_RIGHTS — kernel strips fd passing in game jail (56q)
+- sendfile error path — sbytes untouched on failure (56q)
+- poll — no overcopy past pollfd (56q)
 
 **NEXT STEPS:**
-1. **★ ioctl over-copy on remaining 32 devices** — `/dev/gc` and `/dev/dce` are clean (56m). Praetorian's leak is an unidentified Sony ioctl. The other 32 open nodes lack known command tables — need either brute-force group scan or a 14.10 kernel image to extract driver ioctl tables.
-2. **★ pipe2/socketpair fd-in-cmsg overcopy** — SCM_RIGHTS (fd passing) through unix socketpair: the cmsg may carry more data than the fd array. Scan padding around passed fds.
-3. **★ sendfile(393) error path data leak** — sendfile copies between kernel objects; even if it returns -1, it may have partially initialized an output struct (sf_hdtr) that leaks stack data.
-4. **★ kevent output scan** — kevent returns structs with `udata` and `data` fields; those come from kernel and may contain addresses if the filter populates them from kernel state.
-5. **JSC corpus** — requires browser access mechanism from game process (not currently available)
+1. **★ ioctl brute-force on remaining 32 devices** — The Praetorian KASLR leak is an unidentified Sony ioctl over-copy. `/dev/gc` and `/dev/dce` are clean (56m). The other 32 open nodes lack known command tables. Need group-scan approach: for each device, sweep ioctl codes `0xC0xx_GG00`–`0xC0xx_GGFF` for group IDs 0x00-0xFF, checking which return 0 instead of -1, then scan those output buffers for kernel pointers. This is the last viable KASLR vector that doesn't require a kernel image.
+2. **★ Kernel image acquisition** — without a 14.10 kernel dump, we can't identify the Praetorian ioctl device/command, verify sysent layout, or find new attack surface. Investigate if any accessible syscall or device node can copy kernel .text (e.g. debug stubs, coredump paths, unknown 13.60 syscalls that might work differently on 14.10).
+3. **JSC corpus** — requires browser access mechanism from game process (not currently available)
 
 **DONE (this session):**
 - thr_new(455) arg delivery confirmed (56l) — rdi=arg, gadget at eboot+0x92C67
@@ -397,6 +403,7 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - Thread slot reclaim confirmed (243a) — 27 total spawns
 - SCM_CREDS + sigaction + fstat + getdirentries scan all clean (56o)
 - getrusage + SO_TIMESTAMP + procctl + getrlimit scan all clean (56p)
+- kevent + SCM_RIGHTS + sendfile + poll scan all clean/blocked (56q)
 
 ## When Analyzing Results
 
