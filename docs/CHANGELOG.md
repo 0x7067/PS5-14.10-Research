@@ -1,8 +1,425 @@
-# Changelog — PS5 14.10 Kernel Research
+## 2026-10-23: The post-cut crash corpus reproduces as hangs
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
+232 `LayoutTests` files added by commits after the 17.0 branch point, each wrapped as a standalone
+page with a `testRunner`/`internals` stub and replayed one document per case on 14.10's guide:
+218 started, 214 completed, no memory-safety death. Fourteen cases were pinned up front because a
+popup request ends the WebProcess (Finding 5); six hang the engine (hit-test into an iframe,
+named-slot assignment, font-face load, an insecure-websocket iframe, a scheduled-request
+disconnect, animation suspension); three stops were defects in our wrapper and now pass. The
+wrapper is `tools/layout_pages.py`, with `tools/test_layout_pages.py` pinning each defect. See
+Finding 11 in `docs/WEBKIT_FINDINGS.md`.
+
+## 2026-10-23: The public Relapse browser stage stops at its first primitive on 14.10
+
+The public chain for 7.00-13.60 runs its JavaScriptCore stage on 14.10's guide and
+fails at `Scope not leaked.`: the `super`-through-a-proxy access that is supposed
+to hand back the engine's scope object returns `undefined` here, while the same
+function returns an object under a 2023 JavaScriptCore build. The `super` path
+itself still works, so this is one behaviour, not a broken stage. The public
+kernel half (`aio_multi_wait`) is present and calls correctly, but without the
+browser half nothing can aim it. See [RELAPSE_14_10.md](RELAPSE_14_10.md).
+
+## 2026-10-23: msync(MS_INVALIDATE) is refused, so CVE-2026-49418 does not apply here
+
+The public claim that CVE-2026-49418 gives kernel read/write on 14.10 was tested against the
+call it needs. `msync` is 65 (`narg = 3`); 226 is the shared nosys stub, which is what PR #70
+corrected and what the 400-676 walk reproduces. On anonymous, GPU-shaped, `/dev/dmem0` and
+`/dev/gc` `MAP_SHARED` mappings, and on vnode-backed mappings of a game file, `MS_ASYNC` and
+`MS_SYNC` return 0 while `MS_INVALIDATE` in any combination returns `EINVAL`. The device
+mappings are the object the advisory needs and the invalidate call never succeeds on them,
+so the page list is never corrupted and the use-after-free is never entered. `MS_INVALIDATE`
+is refused for vnode mappings too, so the refusal is not an object-type test either. See
+`docs/MSYNC_CVE_2026_49418.md`.
+
+## 2026-10-23: The kernel selector is sanitized, so `thr_create` cannot leave ring 3
+
+`448a` put `CS = 0x40` (same selector index as `0x43`, RPL 0) into a `thr_create(430)` context
+with a valid `RIP`, `RSP` and the three validator gates. The child **ran**: it executed eboot's
+`mov [rdi], rax; ret` and wrote the marker, with no panic. That left two readings - the selector
+was honoured (ring 0) or it was replaced.
+
+`452a` settled it with an instruction that is illegal at CPL 3 and legal at CPL 0. There is no
+`mov cr0`/`swapgs`/`rdmsr; ret` gadget in eboot's text (`449a`, `450a`, `451a`), so the probe uses
+`in al, dx; ret` (`EC C3`, first hit at `eboot + 0x11E6C3`) with `RDX = 0x80`, chaining to the write
+gadget and a park. The child with `CS = 0x40` **faulted** - marker untouched, loader dumped the
+fault, process survived. So the privileged instruction did not execute: the thread is still CPL 3.
+
+- `453a` sets `IOPL = 3` in the context `RFLAGS` and repeats the test: the child faults again, so
+  `IOPL` is forced to 0 while `IF` (397a) is honoured. The filter is selective, and no port I/O is
+  gained.
+
+- `454a` walks the `flags` field that selects the stack-initialisation branch: `0`, `1`, `3` are
+  accepted, `4`, `5`, `7` are refused at every stack length. The user-controlled stack `copyin` the
+  13.60 decode describes cannot be reached from a game process.
+
+Conclusion: **14.10 replaces or masks the segment selector**. `CS = 0x40` behaves exactly like
+`CS = 0x43`. A malformed selector cannot raise CPL, and the only remaining outcome of a bad context
+is the panic already known from `CS = 0` (`58e` section D). This also replaces the previously
+unsourced "probe 189a" line in `CLAUDE.md`: no such probe, capture or commit exists in this
+repository, and the claim is now measured by `452a`.
+
+## 2026-10-23: The object table is predictable and closed
+
+Every Sony object family hands out an integer handle and takes it back on later calls, so
+whether those integers can be aimed decides whether the families are a heap-shaping device.
+They can be placed but not aimed: one shared table (`435a`), ids of the form
+`generation << 13 | slot` with LIFO exact reuse across families (`437a`, `438a`), lifetimes
+that are reference counted (`439a`), and a generation check that refuses every double
+release (`440a`). The two shapes that could have been a hole are closed by measurement:
+names longer than `0x20` are refused rather than truncated, and the registry key includes
+the type (`445a`). `671` reports limits, not usage, so object allocations cannot be counted
+(`435a`). See `docs/OBJECT_TABLE_14_10.md`.
+
+## 2026-10-22: Native syscall chains from the loader, and three walls it measured
+
+`thr_create(430)` accepts any address for the child's `RIP`, and eboot's text is mapped RX
+and readable, so a gadget chain on a stack we mapped turns the child into a native program.
+The layout that walks is `RIP = pop rax; ret` (`eboot + 0x992`) with the stack holding
+`[num][syscall;ret][pop rax][num] ... [park]`; a per-link argument goes through
+`pop rdi; ret` (`eboot + 0x75DFE`), and `pop rax; 431; syscall` ends the child in
+`thr_exit` so it does not hold a core. Constraints measured on the way: the chain stack
+must be 2 MiB (1200 links fault on 0x8000, run clean on 0x200000), `RFLAGS` at `+0x0F0`
+must carry `0x202` or the child never yields and the core stops scheduling (397a), a paused
+child cannot be killed (`thr_kill` blocks the caller, 398a) and five of them starve the
+loader while exited children do not (405a, 418a), and a `pop rax; ret` byte hit has to be
+verified by execution because one of the six in eboot is not a gadget (405a).
+
+Seven races were then run with native children on both sides: `551` open vs create/delete,
+AIO submit vs cancel, submit vs delete, `fstat` vs `close`, submit vs poll vs delete
+(three children on one id slot), `kevent` vs `close`, and `fstat` vs 500 close/open cycles.
+All clean, with the object usable afterwards, and the descriptor number provably reused by
+the next open (419a). The AIO request queue, the file descriptor table and the kqueue hold
+against native-speed races on 14.10.
+
+Three assumptions died under the same primitive. `mprotect` accepts 32768 of 65536
+protection values - exactly those with bit 2 clear - so execute is the only refused bit,
+not a blanket denial (423a). `mmap` with `prot=0x7` does map a writable page and a child
+jumping to it faults on its first instruction, as it does with `0x33`, so no protection
+this process can request is executable (424a-424c, checked by execution). And sys 532's
+handle check is now fully mapped: with the slots `532(cmd, 0, out, inp, size, 0)` and the
+checksum `byte[3] + byte[0] + byte[1] + byte[2] + byte[5]*byte[4]`, bytes 0-3 change
+nothing, byte 5 feeds the XOR decode (12-13 of 256 values return the variant-mismatch
+status, the rest pass the variant and miss the lookup), and nothing resolves - the
+registration table is empty for a game process (429a-433a).
+
+## 2026-10-22: The game's files are readable and their segments are encrypted
+
+`/app0/eboot.bin` and the eleven PRX in `/app0/sce_module` can be opened and read (385a).
+They are SELF containers with a plaintext ELF header at `+0x160` and a plaintext program
+header table, but the segments are encrypted: the bytes at file offset `0x4000` do not
+match the loaded text at the same virtual address, and the entry point's file bytes do not
+match either (390a). Reading the game's files therefore recovers container structure only,
+not the code or the import tables the mapped image keeps out of reach.
+
+## 2026-10-22: The last un-swept ioctl space is empty
+
+`/dev/gc` and the six `hmd` nodes answer no command in `0x00`-`0xFF` on any of three
+argument shapes (probe 386a). The only non-`-1` returns are `FIODTYPE` and the five
+encrypt codes already recorded in 360a, and none writes to the page. Scraping
+ioctl-shaped immediates out of eboot's text (probe 387a) produces 448 candidates from
+1.2M dwords, which is noise, not a command list.
+
+## 2026-10-23: `/dev/dmem1` ioctl `0x80108017` panics the kernel
+
+- New `docs/DMEM1_COMMAND_14_10.md`. A single `ioctl` of `_IOW(0x80,0x17,0x10)` = `0x80108017` on `/dev/dmem1` opened `O_RDWR`, with a zeroed 0x100-byte argument, ends the process and the console: black screen, power off, storage consistency check on the next boot. Reproducer `probes/phase17_new_vectors/478n_cmd17.lua`, capture `results/phase17_new_vectors/478n_cmd17_20261023_152716.txt`.
+- Found by one connection per command: `probes/phase17_new_vectors/476a_unswept_node_sweep.lua` gave the full 32-bit encoding space to the six unswept nodes; `/dev/dmem1` produced a driver command inside the IOC_IN size-`0x10` block. The command sweep then ran `0x80108000`-`0x80108016` clean (all `-1`) and stopped at `0x80108017`.
+- 13.60 wires `0x80108017` to a single call site (`0x3d211b`, dispatcher `0x3d1ec9`) into `0x3f4c60`, a straight-line stub whose last instruction is `ud2` after a timestamped `printf(0x2f, file)` — an unimplemented command whose handler is `panic`. The three argument words the dispatcher loads are dead: the stub overwrites `rdi`/`rsi` before the print.
+- The earlier "`0x80108013` needs a `0x80108012` prefix" reading is withdrawn, with the mechanism recorded: 477b's capture ends mid-line at `[13] ret=-` because the loader buffers output, and the fatal command was four iterations later. `478m` replays 477b byte-for-byte through the `[13]` line and completes; `478b`/`478f`/`478g`/`478m` show `0x80108013` is inert; `478i`/`478j`/`478k` show no prefix state arms anything.
+- New `tools/ioctl_isolation_sweep.py` sends one generated probe per command number in its own connection and stops at the first command the console does not answer, with `tools/test_ioctl_isolation_sweep.py` (12 offline tests) covering range parsing, probe generation and classification.
+- `probes/phase17_new_vectors/477a_dmem1_read_command.lua`: `0x4008800A` = `_IOR(0x80,0x0A,8)` returns the constant `0x0000000150000000` on `/dev/dmem1`, zeros on `/dev/dmem2`, `-1` on `/dev/dmem0`; the value is not in the 674-region VM map.
+- `/dev/dmem2` answers the same command by never returning: the sweep connects, receives zero bytes, and the console stays up while no later connection executes anything. `probes/phase17_new_vectors/480a_dmem2_block.lua` separates the open from the ioctl with unbuffered output.
+- The delayed death is the same panic: after the read-only run the console went black, powered itself off and ran the storage check, exactly as on the write-mode handle.
+- `/dev/dmem0` does not share the dispatcher: `480d` opens fd 22 and the same command returns `-1` in 78 ms.
+- `O_RDONLY` changes the outcome: `480c` opens the node read-only (fd 22), issues the same command, and the call never returns — 30 s and 180 s runs both stayed silent. A fresh `print` probe ran in 16 ms while it was blocked, so the loader and console were alive; the console went down minutes later and TCP 9026 stopped answering. `480d` (`/dev/dmem0`) could not run.
+- The argument does not matter: `478p` passes a coherent struct (qword 0 = its own page, `+8` = `0x10`, `+12` = 0) and panics with the identical signature; its 8818-byte capture ends at the argument readback.
+- `480b` settles the `dmem2` question: `open(O_RDWR)=22`, `open(O_RDONLY)=23`, complete in 16 ms. The open returns; the ioctl blocks, and minutes later the console panics as on `dmem1`. `480a`'s markers never arrived — the loader buffers, and a probe that blocks loses every line after the last flush.
+- `io.stdout:setvbuf("no")` does not help: 480a printed its header and nothing after it. Generated probes still set it, but attribution comes from one connection per question.
+- `probes/phase17_new_vectors/481a_dmem_arg_matrix.lua` separates the implemented commands from the stubs: `0x80108002`, `0x80108015` and `0xC010801A` answer `0` only for a zeroed argument, `0x4008800A` answers `0` always, and four others answer `-1` for every shape. 13.60 `0x3d2213` explains it: q0 must lie in `[0x2500000000, 0x2558000001)` and both words must be 16 KB aligned with q1 non-zero (`0x3c4e40`).
+- `probes/phase17_new_vectors/482c_mmap_window_hint.lua`: `mmap` honours a hint anywhere in that window (`0x2500000000`, `0x2520000000`, `0x2550000000`, `0x2500400000` all landed as asked; unhinted lands at `0x3108D4000`). `482b` walked the 316-region map and found none inside it beforehand.
+- `probes/phase17_new_vectors/482g_window_exact_placement.lua`: with the mapping placed at exactly `0x2500000000`, `0x80108002` on `/dev/dmem1` returned `0` and the console died moments later, before the next step; `482e` and `482f` died at the call with the same legal range. `482d`'s earlier `0`s were an artefact — its argument page sat outside the mapping `mmap` actually placed, so the kernel saw a zeroed argument, i.e. the empty-range no-op.
+- Not established: whether any window argument returns without taking the console down, and what backs a range inserted into the device map.
+- Not established: the faulting instruction on 14.10 (no 14.10 image), whether a non-zero argument is equally fatal there, whether `/dev/dmem2` exposes the same command, whether a non-`O_RDWR` open reaches it, and whether the trigger survives a firmware patch.
+
+## 2026-10-23: `/dev/gic`'s one driver command is a firmware round-trip, not a window
+
+- New `docs/GIC_COMMAND_14_10.md`. A full 32-bit ioctl sweep of `/dev/gic` (`probes/phase17_new_vectors/471b_gic_encoding.lua`, 2949120 calls) returns exactly one driver command, `0xC0104701` = `_IOWR('G',1,0x10)`, beside three framework commands that answer on every node. The dce node's `0x80088209` was measured inert first: `probes/phase17_new_vectors/470a_dce_command_footprint.lua` shows zero flips in 50k calls and identical `FIODTYPE`/`F_GETFL`/`fstat`/`poll` across seven content steps.
+- The 16-byte argument is `{u64 addr; u32 arg; u32 status}` (`472a`, corrected by `475b`). The "class word" earlier probes reported at `+0x4` is bits 32-63 of the address — our page `0x31115C020` reports `3`, game text `0x1f830000` reports `0`, `0x1d02c8000` reports `1`. Status is `0` or `0x816800FF`.
+- The command reads `0x470` bytes from `addr`, patches `word[0] = 1` and the running title id at `+0x4`, sends them to a firmware service with a caller-supplied 32-bit argument, and writes the `0x470`-byte answer back to `addr` (`475c`-`475e`: fixed extent `+0x0`..`+0x46F`, 1131 of 1136 bytes changed over an `0x4000` fill, head `00010002 "CUSA27390\0"`, tail different on every call, no kernel range qword in the first `0x400` bytes).
+- 13.60 text at `0xab80e0` is that handler: `bzero(buf,0x470)`, `copyin` at `0x259280`, header patch, `0x566bd0` → `0x563fd0`, `copyout` at `0x2591d0`, `mov [data+0xc], status`. Both copies are the kernel's ordinary fault-handled user copies (47-bit mask, `addr+len <= 0x800000000000`, recovery address `gs:[0x20]+0x108`, `stac`/`clac`), so the handler's only validation is the copy itself and it cannot reach kernel memory.
+- `0x563fd0` puts the buffer in a `malloc(0x4000)` bounce page as `{type=2, flags, arg1, in, out=in+0x470}`, calls `0x5a4610`, and copies `bounce+0x470` back. The privilege bit (`bit 62` of a credential word, `0xab810b`) only sets `flags<<16`.
+- The 473e/473f "lethal address" reading is withdrawn. `0xf0000000` is the map's prot-`0x3` eboot record; `475f` and `475g` show it reads as zeros and accepts userland stores including a no-op write-back. Feeding it to the command puts 0x470 bytes of service output into the game's own zero-filled image data, which kills the game. This is self-corruption, not a handler fault.
+- Probes: `probes/phase17_new_vectors/470a_dce_command_footprint.lua`, `471a_dmem0_encoding.lua`, `471b_gic_encoding.lua`, `472a_gic_command_shape.lua`, `473a`-`473f`, `474a_gic_address_boundary.lua`, `475a`-`475g`. Captures under `results/phase17_new_vectors/470*`-`475*`.
+- Not established: whether the service keeps state between calls, what it does with the caller's 0x468 unpatched bytes, whether the returned record is a signature or MAC over the request, and whether the crash reporter's ~60 s console TCP stall after the game dies is specific to this path.
+
+## 2026-10-22: The GPU's device mappings cannot be read, and a store cannot be verified
+
+The graphics driver's aperture is mapped inside every game process: `SceGnmTrapCode`
+`0x0-0x4000`, `SceGnmTrapData` `0x4000-0x8000`, `SceAgcDdid` `0x8000-0x104000`,
+`SceGnmEopFifo`, `SceGnmShadowRegInfo`, `SceGnmCwsr` up to `0x1144000`,
+`SceGnmMisc`, `SceGnmAcqRb` `0x1148000-0x1328000` (all `p=0x33`), `SceGnmDriver`
+`0xE0000000` (`p=0x10`) and `SceGnmDumpArea` `0xE0300000` (`p=0x3`).
+
+Reading any of them terminates the process past `pcall` - 376a on a `p=0x33`
+region, 380a on the dump area - so their contents cannot be observed.
+
+Writing appears to succeed, and that is not evidence. `memory.write_buffer` is a
+`memcpy` inside the emulated call, and a store to `0x7F0000000000`, an address
+that is certainly not mapped, also reports success and leaves the process alive
+(381a). The write path cannot report a failed store.
+
+The consequence is that the command ring cannot be driven from this process.
+Packets written blind into `SceGnmAcqRb` would have no observable result and no way
+to tell whether the store landed, and the ring's producer index lives in memory
+that cannot be read.
+
+## 2026-10-22: A game process can kill the compositor, and the protocol it speaks is measurable
+
+`/system_tmp` holds seven UNIX sockets and three of them accept a connection from
+the game's jail. Sending 8 KiB to `GnmCompositorRestricted` or
+`AgcCompositorSppSocket` makes the daemon stop listening until the game process restarts -
+the node stays, `connect` returns `ECONNREFUSED` - and the display goes black,
+because those two are the compositing path. That is an unprivileged denial of
+service and the first effect any probe here has had outside our own process. It is
+not memory corruption: there is no crash address, no controlled value and nothing
+reclaimed.
+
+The compositor does speak, though. A request is `{u32 size; u32 command; ...}` in a
+message of at least 0x30 bytes, one request per connection; a reply is
+`{u32 type=1; u32 flags; u32 payload_len; u32 status; payload}`. Commands 0 to 6 are
+recognised and 7 and above answer `flags=0x80FF`. Command 1 is the only one that
+answers without `0x80D40009`, and command 0 returns a 4944-byte block whose payload
+is zero except one `0xFF` at `+0x2C`. Nothing in the header except its size and the
+command word changes any reply.
+
+The rest of the protocol is out of reach from here. No module that could be the
+client can be read: library `.rodata` is `p=0x1` and a 0x100 read at
+`libSceNpGameIntent.sprx 0x4E8000` kills the process, while eboot's `p=0x5` text
+reads fine. Captures: `results/phase17_new_vectors/361b_socket_consumption_20261022_175443.txt`
+through `377a_sprx_read_ladder_20261022_181129.txt`. Write-up:
+`docs/SYSTEM_SOCKETS_14_10.md`.
+
+## 2026-10-22: The AIO batch entry works, and the GPU pool zeroes its pages
+
+Sys 661 kills on every shape tried, and that was carried as "AIO is dead". There are two submit entries. 669 takes a batch of descriptors - `669(cmd, reqs, count 1..128, class 1..3, ids)`, stride `0x28` - and it works: `cmd=1` reads and `cmd=2` writes, a completed request reports `state=0x3` from 664, and the result word carries the number of bytes moved (`0x10` for a 16-byte read of `/dev/urandom`, with different data on every read). Identifiers are slot numbers with a generation tag in the high word, 24 requests were outstanding at once, and deleting four freed those slots for the next four. 661 says nothing about the rest of the family.
+
+The refusal path matters: 669 returns `0` whether or not it queued anything, and a spent queue answers `0x80020005` in the result word only. The destination is range-checked - an unmapped page and a kernel-half address both return `0x8002000E` (EFAULT), each followed by a control that completes - but the byte count is not clamped to the buffer, and `count = 0x14000` into a 4 KiB destination writes through the process heap and kills the loader.
+
+Three negatives from the same round. The GPU pool **zeroes pages on allocation**: a dense scan of a complete 64 MiB chunk (8 388 608 qwords) and 49 152 samples across 384 MiB found no nonzero word, no kernel-shaped value and no strings, so the uninitialised-page KASLR leak is dead. `637`'s store is **inert**: mapping three chunks, storing `0xFFFFFFFF` and mapping again reaches the same six-chunk ceiling. And osem's slot order on 14.10 is `(name, attributes, initial, maximum)` - the dossier has the name last, which is why every earlier call failed.
+
+Captures: `results/phase17_new_vectors/352a_aio_batch_20261022_160559.txt` through `352k_aio_commands_20261022_161843.txt`, `346b_fmem_ceiling_20261022_161726.txt`, `348a_gpu_pool_scan_20261022_155156.txt`, `349c_osem_wait_20261022_160530.txt`. Write-up: `docs/AIO_BATCH_14_10.md`.
+
+## 2026-10-22: The performance-counter syscalls store and return, but only for the caller's own threads
+
+Sys 563-567 were never called. On the caller's own threads everything works: 563 enables and 564 disables (`0`), 566 stores a counter word at `PCB+0x190+8*index` (`0`), 565 stores an event-select word (`0`), and 567 reads a counter back (`0`, returning the exact value 566 wrote). The validation matches the dossier exactly - index 6 is refused, a rejected event-select bit (`0x10000`) is refused rather than masked, and a process selector that cannot resolve returns `-1`.
+
+The read-back is the control that makes this more than a list of zeroes: the store lands where the dossier says it does, and the six slots are the entire range. The process-selector path, which would reach another process's pcb, requires `cred+0x58 == 0x4800000000010003` and is closed to a game process.
+
+Capture: `results/phase17_new_vectors/327a_opmc_scope_20261022_123153.txt`.
+
+## 2026-10-22: The death-on-touch syscalls are SIGSYS, and fstat is not one of them
+
+Every slot recorded as lethal on this firmware was lethal for one reason: the shared `nosys`
+trampoline raises SIGSYS, and an uncaught SIGSYS terminates the process. The body is in the
+13.60 capture and it is the same 4,096 bytes for 561, 562, 570, 573, 631, 650 and 651: lock,
+build a signal record with number 12 and code `0x10006`, deliver, return `ENOSYS`.
+
+With SIGSYS ignored, 562, 650, 651, 665, 668, 631 and 661 return `-1` instead of ending the
+process, and so do 189, 306, 307, 308, 337, 570 and 573 (probes 353a/353b). The kill was a
+signal disposition, not a property of the handler.
+
+That retires one dead end and corrects another. `fstat` (189) is **present**: it returned `0`
+and wrote a stat record for an open `/app0/eboot.bin` descriptor with the default
+disposition (353c/353d), and `189(0,0,0,0,0,0)` returns `-1` without harmful effect, so the
+"fstat kills" entry from 152j does not reproduce. The AIO single submit (661) is the `nosys`
+trampoline, which is why it killed and why its siblings in 662-670 were never reached -
+669 is the only submit entry.
+
+`docs/SYSCALL_ABSENT_VS_LETHAL.md` now leads with the resolution and the method change:
+probe a possibly-absent slot with SIGSYS ignored, or the experiment destroys its own result.
+
+## 2026-10-22: Suspending a thread exposes its saved registers, and setting them does not exist
+
+Sys 632 (`thr_suspend_ucontext`), 633 (`thr_resume_ucontext`), 634 (`thr_get_ucontext`) and 635 (`thr_set_ucontext`) were called for the first time on a thread this process created.
+
+632 suspends and returns `0`; 633 resumes and returns `0`; 634 refuses a running thread and the caller's own thread with `-1`, but returns `0` once the target is suspended, copying 0x4c0 bytes of a 0x500-byte snapshot into the caller's buffer. The saved frame in that copy carries the values the thread was started with - RIP at `+0xE0`, CS at `+0xE8`, RFLAGS at `+0xF0`, RSP at `+0xF8` - which is the same register set `thr_create` takes, shifted.
+
+Every qword in the 0x4c0-byte copy was scanned for a kernel pointer. Fourteen were nonzero (the register words, the segment selectors, the residue of the context header) and **none** was in the kernel range: the snapshot is zeroed before it is filled, so there is no uninitialised-tail leak.
+
+635 returns `-1`. The 13.60 handler dossier gives its whole body as `mov eax, 0x4e; ret` - a stub returning 78 - so on 14.10 the entry is not even the stub the capture describes. Writing a suspended thread's registers back is not available, and the one thing this family could have added over `thr_create` (rewriting a thread after it exists) is the part that is missing.
+
+Captures: `results/phase17_new_vectors/325a_thr_ucontext_20261022_122833.txt`, `results/phase17_new_vectors/326a_thr_set_ucontext_20261022_122948.txt`.
+
+## 2026-10-22: The font-face use-after-free is reachable on 14.10, and it hangs the guide
+
+- The public CVE-2026-43715 (WebKit bug 313577) lead was tested on the console with five probes. The trigger is real and the guide reaches it: an injected `@font-face`, a read of `face.loaded`, a `FontFace.prototype.then` getter that removes an existing style element and forces layout, then `face.load()`. The getter is read synchronously inside `load()`, so the code path the fix guards is live.
+- **The effect is not a use-after-free.** The client loop the 2026 fix guards is a snapshot of strong references (`copyToVectorOf<Ref<CSSFontFaceClient>>`), so a client removed by the getter cannot be freed while the iteration runs. On 14.10 the WebProcess instead loops inside the layout the getter forced and dies of memory exhaustion within a second - the console shows "there is not enough free system memory".
+- Five controls separate the ingredients: removing an element that does not exist is harmless, removing a real one without layout is harmless (`ffB-returned-fired=1`), the same getter on a plain `Promise.resolve(thenable)` returns immediately (`C-returned-got=1`), and only the font-face path with a real removal and a forced layout hangs. Getter caps of 2000 and 4 entries were both never reached, which rules out re-entry through our own code: the promise's `then` is read once and the loop is inside the engine.
+- Consequence recorded in `docs/WEBKIT_FINDINGS.md` **Finding 10**: this is a denial of service against the guide, the same shape as Findings 7-9, and the lead is closed as a route to memory corruption.
+
+## 2026-10-22: The "-1" syscalls are not dead, and one of them stores a chosen qword
+
+- **The `-1` column is not a verdict.** Forty-odd handlers carry a sweep answer of `-1` from six zero arguments. Called instead with real pointers, six of them answer: 538 `evf_create` returns a handle, 540 resolves a registered name, 557 `namedobj_create` returns a handle, 598 and 659 copy out, 572 `virtual_query` returns 0, and 637 `set_phys_fmem_limit` returns 0. Full write-up in [OBJECT_FAMILIES_14_10.md](OBJECT_FAMILIES_14_10.md).
+- **637 is the first handler measured here that writes a caller-chosen 64-bit value into a kernel structure without a capability.** With target id 0 - this process - the capability helper that gates 618, 646 and 671 is skipped, and the value lands at `parent+0x200 -> child+0x280`. Foreign ids 1, 2 and 5 return `-1`, so the bypass is per-process by design. The offset is fixed and its meaning is unknown; no path turns it into a read, a pointer, or a second location.
+- **637 also waits.** A value below the process's current physical memory usage parks the caller in the kernel - `637(0, 17)` never returned and needed a game relaunch - while 2 GiB and 4 GiB return immediately. The handler is a wait-for-usage-to-drop, not a setter, which is why six zeros and a small value both looked like `-1`.
+- **The evf family works and leads nowhere.** 544 set, 545 clear and 546 cancel all accept a handle the process created; 541 refuses to delete it; 543 needs a mode encoding not yet found. Handles the process never received (`0`-`517`, `65536`, `2147483647`) are rejected, so the lookup is not a wild dereference.
+- **Named objects do not survive their creator.** 538 with attribute `0x100` registers an object by name and 540 resolves it in-process, but after a relaunch all four registered names return `-1`, so the registry is process-scoped and there is no cross-process handle to another process's kernel object.
+- **573 `mdbg_call` powered the console off once**, during the sweep, and does not reproduce: the same call in a fresh process killed only the loader while the console stayed up. One observation and one negative control, no mechanism claimed.
+- Probes 334a-342a and 344a and their captures are in this commit, along with a correction to the probe list that had wrongly included the documented kill row 573.
+
+## 2026-10-22: Strategy page brought up to the measured state
+
+`docs/STRATEGY.md` still opened with "no threading" and the W^X framing from
+2026-10-16, which has been wrong since 156c/156d. The page now opens with the
+current position: the six primitives that exist (Lua execution, syscall
+invocation, thread creation with controlled registers, the GPU pool, the event
+and named-object families, and 637's fixed-offset store), the walls that are
+measured rather than assumed (no credential context, no device context, no
+kernel pointer, no arbitrary kernel address, death-on-touch syscalls, the jail,
+and the browser), and the four things still open. The 2026-10-16 text is kept
+below as history.
+
+## 2026-10-22: The game process is in a jail with no mounts and three reachable system sockets
+
+- New [JAIL_14_10.md](JAIL_14_10.md). Inside a game process, only `/`, `/app0` and `/dev` open; `/mnt`, `/mnt/usb0`, `/mnt/usb1`, `/mnt/ext0`, `/mnt/ext1`, `/data`, `/user`, `/system` and `/tmp` all return `-1`. The jail root holds `IMt9cl0VzR`, `system_tmp`, `dev`, `app0`, `savedata0` and `av_contents`, and no entry is a mount point for removable media.
+- **The USB route is closed from here.** A stick mounted by the system never appears in this namespace, so no filesystem image is ever supplied by the game and the `msdosfs_readdir` padding disclosure (CVE-2020-25579) cannot be reached this way whatever 14.10 still carries.
+- `/dev` carries 79 nodes reachable through directions the earlier ioctl rounds could not open. `dbggc`, `sbl_srv`, `encdec`, `uvd_dec` and `mp3` refuse both `O_RDONLY` and `O_RDWR` - the debug graphics node is closed by the same credential check as the update devices - and `sce_zlib`, `ajm`, `ajmi` and `rng` answer exactly one command each (`0x4004667A`, the file layer's `FIODTYPE`), no driver table.
+- **Three sockets in `/system_tmp` accept a connection from a game process**: `GnmCompositorRestricted`, `AgcCompositorSppSocket` and `VrTracker2DomainSock` return `0` from `connect`. `GnmCompositor`, `SceImageUtilAgent`, `SystemTts` and `redis.sock` refuse, and every DGRAM attempt is `-1`. The two compositor sockets accept and hold any run of zeros without answering; `VrTracker2DomainSock` accepted two connections and then refused for the rest of the run, which reads as a listen backlog of one on a service that never accepts a game client.
+- Nothing here is a primitive: the sockets are reachable parsers whose protocol is unknown, and their binaries are not in the jail. What the round establishes is the shape of the boundary, not a way through it.
+
+## 2026-10-22: Sys 654 is called with its real contract, and no region qualifies
+
+- **`sys_654.md` recovers the actual shape**: `narg=5`, slots `(address, length, operation, flags, reserved)`, 64 KiB alignment on address and length, flags limited to bits `0x33`, and an entry check that rejects any object whose type byte at `+0x9d` is not `11`. Every earlier call - `183a`'s `(handle, 0, 0x1000, buf)` - put a blockpool handle where the address belongs, so nothing had reached the body.
+- **With the real shape it still refuses everything**: a 64 KiB-aligned GPU mapping, operations `0`-`20`, flags `0`-`0x40`, misalignment controls and zero length all return `-1`, and the `547` region record stays byte-identical.
+- **The reason is the object type, not the arguments**: `312a` walked all **314** regions the process map reports and called `654(start, 0, 0, 0, 0)` on every one, including the **82** that are 64 KiB aligned. **Zero were accepted.** No mapping a game process owns carries object type `11` - the same wall `673` hit, now measured across the whole map instead of one address.
+- **`84a`'s title was wrong and is corrected here**: `653` is `blockpool_open` returning a descriptor (190a proved that with `close(23)`), not a "GPU PTE modifier". The handler's page-table code is the block pool's internals, not an API a caller reaches. Probes `311a`, `312a`, `310a` and the first `84a` capture are in this commit.
+
+## 2026-10-22: mmap_dmem is not a physical-memory mapper, and the authid gates hold
+
+Sys 628 `mmap_dmem` was called with the six-slot layout its handler reads for the first time. The dossier's "descriptor -1 bypasses the device lookup" made it a candidate for mapping physical memory, but twenty-four calls across descriptor `-1`, `/dev/dmem0`, `/dev/zero` and `0`, three protections, flag `0x40`, a nonzero address hint and two offsets all return `-1`. The refusal does not depend on the descriptor, so the entry rejects before the lookup - another device-context wall, not a mapper.
+
+The direct-memory nodes do open: `dmem0` (22/23), `dmem1` (24/25), `dmem2` (26/27), `dce` (28/29), `gic` (30/31), `gc` (32/33), `zero` (34/35).
+
+The authid gates were then tested the other way round. 535, 536 and 563-566 compare `cred+0x58` against identity values; every earlier probe used selector `0`, which skips that check. With this process's own pid, **all six return `-1`** while selector `0` still returns `0`. Naming your own process does not pass the gate.
+
+587 is the only handler that exposes the credential record: 0x88 bytes from `target_cred+0x58`, but on the path a game process reaches only the capability word survives - `0x20000000` at record `+0x0C` for this process, `0x40000000` for system pids 1/2/5/16/30, and `+0x08` (the word whose bit 62 gates 618, 646 and 671) zero for all. The identity is never readable and no handler writes it.
+
+Captures: `results/phase17_new_vectors/{330a_dmem_open,331a_mmap_dmem_matrix,332a_authid_gates,333a_cred_foreign_pid}_20261022_1236*.txt`.
+
+## 2026-10-22: The AIO batch calls work, and their ids come from the call that kills
+
+- 662, 663 and 664 returned `-1` to six zero arguments in every earlier sweep. Given the shape the 13.60 contracts name - an id array, a count and an output array - all three return `0` and write one Sony status per id: `0x80020000` for an invented id, `0x80020003` for the real kernel thread id `0x18E65` and for the process id `0x6A`. They are working batch calls, not absent slots.
+- The id they accept is neither a kernel thread id nor a process id. In 13.60 the three are AIO batch delete, batch wait and batch poll, so the ids are AIO request ids - and those only come from a submission path, which is 661, the number that kills before it returns.
+- Both length questions were measured and both are bounded: `count = 0x400` against a `0x1000` id page returns `-1` instead of reading out of it, and `count = 4` with an output array ending four bytes before a page boundary returns `0` without faulting. There is no overrun here to aim.
+- `CLAUDE.md` and `docs/ATTACK_SURFACE.md` no longer describe these three as "rejecting zeros"; `docs/AIO_RANGE_14_10_EVIDENCE.md` carries the measurements and the id-space reading.
+
+## 2026-10-22: The AIO batch calls work, and their ids come from the call that kills
+
+- 662, 663 and 664 returned `-1` to six zero arguments in every earlier sweep. Given the shape the 13.60 contracts name - an id array, a count and an output array - all three return `0` and write one Sony status per id: `0x80020000` for an invented id, `0x80020003` for the real kernel thread id `0x18E65` and for the process id `0x6A`. They are working batch calls, not absent slots.
+- The id they accept is neither a kernel thread id nor a process id. In 13.60 the three are AIO batch delete, batch wait and batch poll, so the ids are AIO request ids - and those only come from a submission path, which is 661, the number that kills before it returns.
+- Both length questions were measured and both are bounded: `count = 0x400` against a `0x1000` id page returns `-1` instead of reading out of it, and `count = 4` with an output array ending four bytes before a page boundary returns `0` without faulting. There is no overrun here to aim.
+- `CLAUDE.md` and `docs/ATTACK_SURFACE.md` no longer describe these three as "rejecting zeros"; `docs/AIO_RANGE_14_10_EVIDENCE.md` carries the measurements and the id-space reading.
+
+## 2026-10-22: Sys 532 answers for the first time, and its handle check is forgeable
+
+- **`87a` was written on 18 October and never executed** - no capture existed - so every statement about sys 532, the largest handler in the 13.60 capture with ~70 commands and a user-controlled size, rested on the decompile. It has now run: 532 dispatches on 14.10 and returns Sony status codes, not `-1`, for the commands that skip the privilege check.
+- **Reachable commands are `0x18`-`0x1E`, `0x20` and `0x2F`.** `0x18`-`0x1D` reject the packed handle with `0x800D0204`; `0x1E` writes `3` and ignores the sub-command; `0x20` writes `0x800D0219` (SANDBOXED) at exactly size `0x30` and `0x800D0208` (INVALID_SIZE) at every other size; `0x2F` writes `0`. The size gate is `0x800` for the handle commands, matching the decompiled `cmp rcx, 0x801`.
+- **The handle checksum is forgeable from user space.** Implementing the dossier's formula - `byte[3] + byte[0] + byte[1] + byte[2] + byte[5]*byte[4]` in the low 16 bits against bytes `[6:7]`, `byte[4] xor 0x6b` as the type index - moved the handler from `0x800D0204` to `0x800D0203` for every type `0`-`0xC`. The integrity check is not a barrier to a caller who reads the decompile; it is a barrier to corruption.
+- **The surface then stops at the registration table**, which is empty for a game process. Same wall as the device index on 622: twenty ungated commands - the fifteen whose credential bit is zero, plus the five the bitmap leaves open - each return one status dword, `0xFFFFFFFF` or `0x8002004E`, for every index `0`-`15`, with no length leak and no multi-dword copy.
+- Probes `87a`, `305a`-`309a` and their captures are in this commit.
+
+## 2026-10-22: Sys 601 is a debugger service, and 0x03/0x04 are lethal
+
+- The dossier marks `0x05` (process info copyout), `0x10` (kernel allocation + copyout) and `0x12` (writes into proc `+0x528`/`+0x578`/`+0x580`) as carrying no credential check. Called with a real output page and both argument orders, all three return `-1` and write nothing.
+- **`0x03` and `0x04` terminate the process.** 55d never called either; `0x04` is the dossier's "privileged process control" with two checks, and it dies at touch.
+- `0x00` returns `0` and writes `0x00000100`; `0x01`/`0x02` return `-1`; `0x07`, `0x09`, `0x0d`, `0x13`, `0x14`, `0x19` return `0` and write nothing; `0x15`-`0x18` return `-1`.
+- The shape is a debugger service without a session, not a leak surface.
+- Probe defect recorded: the sentinel `0xB1B2B3B4B5B6B7B8` exceeds 2^53 and Lua rounded it, so 323a's "changed" column was meaningless. Captures keep both runs.
+## 2026-10-22: physhm_open answers, and its mapping is not user memory
+
+- **Sys 629 `physhm_open` had only ever been called with six zeros.** With its recovered four slots it takes the sentinel `arg0 = 1` and returns a **descriptor** for `arg1 = 2` and `arg3` in `0..3`: `629(1, 2, any, 0..3) -> 22 / 26 / 27`. Every other `arg1` from 0 to 0x120, every page multiple and every power of two is refused; `arg2` is ignored; `arg3 = 0x1000` is refused, so it is a mode enum and not a length.
+- **The path branch is closed**: every path tested (`/`, `/dev`, `/dev/physhm0`, `/physhm0`, `/tmp`, `/app0`, `/dev/physhm`, `/dev/dce`) returns `-1`, `open("/dev/physhm*")` returns `-1` in both modes, and `630 physhm_unlink` returns `-1` for both a path and the sentinel. A game process can only reach the sentinel branch.
+- **The descriptor refuses every file operation**: `FIODTYPE`, `0x4004667B`, `FIONBIO`, `read`, `write` all `-1`, and `628 mmap_dmem` refuses it in four argument positions.
+- **The mapping exists and is fatal on first access**: `mmap(0, 0x1000, RW, MAP_SHARED, fd, 0)` succeeds and returns a full 34-bit address (`0x3_10F10000`), and the first read at that address terminates the process inside `pcall` - four probes, the last using the correct untruncated pointer. A successful `mmap` whose first user access faults is a supervisor-accessible mapping, not user memory, so the object holds nothing reachable and there is no write path.
+- **Probe bug recorded**: `sgn()` returns only the low 32 bits, so three of those probes read a truncated address. Addresses must be carried as `(high, low)` and rebuilt with `uint64(string.format("0x%X%08X", h, l))`.
+
+
+## 2026-10-22: Withdraw unsupported CVE-2019-5607 chain claim
+
+- The old 13.60 note inferred a missing reference cleanup from the absence of an inline decrement after `fhold`. FreeBSD's actual fix calls `unp_internalize_cleanup_rights()` on the error path, so that local instruction search is not a patch-state test. The cited `ktext_1360.bin` is absent from this checkout; the retained `kernel_text.bin` is a different capture. No 14.10 refcount leak is established.
+- Successful 14.10 `SCM_RIGHTS` transfer remains a normal reachability result. Probe 89a cannot measure the old file object's refcount with `fstat()` after closing its fd and mistakes ordinary fd reuse for type confusion. Its old exploit-chain document has been replaced with a correction; the probe is marked obsolete as a CVE discriminator. Keep this correction private while the candidate's status is unresolved.
+
+## 2026-10-22: IPv6 source-filter static lead from labeled 13.60 capture
+
+- Offline disassembly identified a source-filter-shaped routine at RVA `0x900940` in the saved capture labeled 13.60. It copies the 152-byte request and a bounded source list before a later membership lookup path, consistent with the upstream fixed order. The option jump table is outside the capture, so the option-74 identity remains inferential, and this says nothing definitive about 14.10's handler. See `docs/PRIVATE_IPV6_MSFILTER_1360_STATIC_2026-10-22.md`.
+
+## 2026-10-22: IPv6 filter race controls and sustained concurrency
+
+- `50l` and `50m` distinguish filter-first (`filter=0`) from leave-first (`filter=-1`) with two child threads and verified gate reads. The filter-after-leave single-thread control also returns `-1`.
+- **Correction:** `50p` completed 16,384 child syscall attempts and 8,192 parent leave/rejoin pairs, but it did not restore all child syscall arguments. `50q` recorded only 1/4,096 accepted calls; no-parent `50t` reproduced this, so `50p` does not establish sustained valid filter updates.
+- Sequential controls `50r` and `50s` accept identical filter requests, including after leave/rejoin. `50u` showed restoring RCX alone was insufficient. `50v` restored RDI, RSI, RDX, RCX, and R8 before each call and recorded 16/16 successes without the parent. The corrected `50w` race recorded 173 accepted and 1,875 rejected child calls during 2,048 successful parent leave/rejoin pairs, with a live process. The rejected calls do not establish a UAF; no kernel pointer or kernel read/write was demonstrated.
+- Matched 2,048-call no-parent control `50x` recorded 2,048/2,048 accepted filter calls. This rules out late-chain argument loss and duplicate-request rejection as explanations for `50w`'s failures under these controls; it does not identify a kernel memory defect.
+- The old "threading completely blocked" statements in Findings 2 and 40 were corrected as dated results from probes 27/43e; `thr_create(430)` works in later 14.10 captures.
+
+## 2026-10-22: IPv6 multicast filter reachability corrected on 14.10
+
+- `50e_ipv6_msfilter_reach.lua` ran with a live loader but its 148-byte `__msfilterreq` was misaligned for amd64 `sockaddr_storage`, so its uniformly rejected option-74 calls do not show the handler is absent.
+- New `50f_ipv6_msfilter_aligned.lua` uses the 152-byte layout and records successful INCLUDE/EXCLUDE zero-source requests and a successful INCLUDE request with one userland source pointer. Invalid mode, truncated length, and wrong family are rejected. Decisive capture: `results/phase11_network_attacks/50f_ipv6_msfilter_aligned_20261022_183727.txt`.
+- The handler and source-list copy path are reachable from the 14.10 game process. Sony's lock ordering, the FreeBSD CVE's use-after-free, and any kernel memory primitive remain unverified. Keep this candidate private.
+
+## 2026-10-22: The device ioctl space is measured, and the drivers are struct fillers
+
+- **Thirty-two million ioctl calls across 31 nodes** covered the whole command byte, every direction and the full 14-bit length field. The device surface answers with two things: one inert command on `/dev/dce` and a twenty-five-command table on `/dev/gc`. Full write-up in [DEVICE_IOCTL_14_10.md](DEVICE_IOCTL_14_10.md).
+- **The earlier sweeps were searching a sixteenth of the space.** They fixed the length field to `0, 4, 8, 0x10, 0x20, 0x40, 0x100`, and the graphics driver declares commands at `0x18`, `0x28`, `0x30`, `0x48` and `0x888`. Widening the length field turned 20 commands into 25 and found every struct-sized one.
+- **The three questions that decide whether an ioctl is a primitive were each measured, and all three came back no.** No command follows an address stored in the struct (283a sets the first qword to a second user page and watches it), no command changes behaviour when the struct contents change (285a, 287a call each command with `0xAA` and with zeros, identical results), and every write stays inside the declared length (dumped across the whole page, including the four struct commands).
+- The values written back are small constants - `0x101`, `3`, `0x80000000`, `0x0C`, `0x5C`, `0x10`, `0` - and none of them move between calls in a way that would reveal a kernel or GPU address. There is no information leak on this surface.
+- **One real defect: `0xC0048125` blocks the calling thread forever.** The console keeps rendering, the loader keeps accepting connections, and the app fails on exit with a black screen and a system error; the thread stays inside the driver. It returned `0` in 280a, before `0x80888123` had ever run, and hung in 281a, 282a and 284a after it. A hang denies service and hands back nothing.
+- The update device is not reachable either: `273a` opens `/dev/pup_update0`, `/dev/pup_update`, `/dev/sbl_srv`, `/dev/encdec` and four more aliases and every one returns `-1`. Decrypting a PUP needs the credential that `ps5-pup-decrypt` fakes with a kernel write, so that route is a consequence of privilege rather than a way to it.
+- Probes 273a-287a and their captures are in this commit. `283a`'s second page, `285a`'s 0x888-byte struct and `286a`'s length sweep are the three that carry the conclusion.
+
+## 2026-10-21: The corpus pass completes, and every divergence is a hang
+
+- The 1919-page JSC build was walked to the end on 14.10: **1899 pages reported `OK`, 27 were pinned as unsafe to run, and no page outside the pin list was started without finishing**. Seven guide reloads were needed; every one was a page that exhausted the WebProcess's memory or froze its main thread, never a crash and never a lost beacon. Sessions and logs are listed in [Finding 9](WEBKIT_FINDINGS.md).
+- **Three divergences, one shape**: the engine should throw and instead loops. `proxy-handler-traps-cache-poly-proto-handler` spins in a release build, asserts `isCell()` in a debug one, and exhausts memory on the console; `regress-125602977` never throws the `TypeError` that an unconfigurable redefinition requires; `use-static-private-member-in-computed-property-name` hangs inside class evaluation on the first call, where the parse should have failed. All three are denial of service - none of them hands a page a value it chose.
+- **No memory-safety report anywhere.** 1919 sources replayed verbatim under a Debug+ASAN `jsc` with the shell shims gave `{'clean': 1070, 'asan': 0, 'assert': 0, 'signal': 0, 'timeout': 123, 'parse': 216, 'exception': 510}`, and ~17 000 number/compare/arithmetic mutants of the same sources gave nothing. The 510 exceptions are harness gaps (dynamic `import('./aN.js')`, `$vm`, async main), not engine bugs.
+- **Two harness defects had made every earlier offline run meaningless.** `JSC_SHIM` starts with `<script>`, so feeding it to `jsc` died at parse before a single case executed, and the classifier counted that as clean; the shim also touches `window`, which the shell does not have. `JSC_SHIM_JS` now strips the wrapper, adds `var window = this;`, and the classifier reads `stdout` as well as `stderr` - jsc prints uncaught exceptions to stdout - with separate counters for `asan`, `assert`, `signal`, `parse` and `exception`.
+- **The builder now drops the classes the pass measured**: watchdog loops under `requireOptions` as well as `runDefault` (index 1892), allocations at or above 256 MB resolved through the file's own `const` definitions (indexes 425-427, 949), `//@ memoryHog!` (index 74), and anything `jsc-time` measures over its wall-clock budget (index 625 needed hours). The build is **1903 pages** and the test file is at 15 tests.
+- **The pin list is enforced by the runner now.** `/corpus/skip.json` carries both `skipped` and `next`, and the runner steps over pinned indices and clamps a stale `start` up to the cursor, so a document that replayed an old handoff can no longer restart the walk at zero.
+
+## 2026-10-21: Index what the 145 decompiled handlers say about their arguments
+
+- `tools/syscall_contracts.py` reads `results/kernel_handlers/analysis/sys_*.md` and the matching `results/kernel_handlers/decompiled/sys_*.c`, and writes `docs/SYSCALL_CONTRACTS_13_60.md`: one row per handler with its argument count, the argument offsets it dereferences, the largest byte count it copies back, whether its prose names a user pointer, and - for the nine handlers whose decompilation carries an analyst struct - the recovered argument field names.
+- 145 handlers, 142 with a description, 9 with recovered fields: 533 `unused_slot_0, size, flags`; 548 `descriptor, flags, user_operations, count, user_processed`; 659 `handles_out, capacity, count_out`; 660 `module_handle, slot_padding, info_inout`; 662 `ids, count, results`; 663 `ids, count, states, wait_mode, timeout_inout`; 664 `ids, count, states`; 665 `ignored_slots`; 657 `commands, count, processed_count, flags`.
+- The index changes how the AIO range reads. 662, 663 and 664 reject a request whose `count` is outside 1..128, and every earlier sweep passed six zeroes - so those results say "the count check refused this", not "there is no handler". 235a and 236a are written against these contracts; neither has run yet.
+- 548 is the only virtual-memory writer found that does not go through `mprotect`; its recovered operation record carries a protection byte and the analysis records that `7` is not rejected, which is why it is worth a measurement rather than an argument.
+- **sys 622 was measured with the wrong argument layout for three days.** The 13.60 handler reads six slots - `cmd, sub, buffer, secondary address, size <= 0x40, extra` - and the 2026-10-18 sweep passed `(cmd, buffer, size, ...)`, so the command came out of the buffer and every call returned the same error. With the right slots the top-level gate is visible twice: size `0x41` returns `0x800E0001`, size `0x40` returns `0x8002004E`. The 113 commands in `0x200-0x270` and `0x813` then execute past the auth gate, return `0`, and write `0xFFFFFFFF` (not-found, not data). The `0x400-0x493` group returns `-1` when the `copyin` from `arg3` fails and kills the process whenever it succeeds - at any size including 1, and at size 0 with a null pointer - so the fault sits after the copy and does not depend on the bytes copied. Sliding `arg3` to the end of a mapped page (547 gives the region, so the boundary is exact) shows the copy is `arg4`-sized: 0x30 bytes of room returns `-1`, 0x40 fits and dies. No kernel pointer, no overrun, no write primitive; the group needs a device context this process cannot create.
+- Every row is a 13.60 observation from the captured handlers. 14.10 behaviour still has to be measured, and the document says so in its header.
+- Built from those contracts instead of six zero arguments, three handlers answered. **547 works as a region oracle** (`ret=0`, start/end/protection filled: heap `prot=3`, GPU page `prot=0x33`), **659 works** (`ret=0 count=3`, handles `0x13` and `0x14`), and **662/663/664 are alive**: `ret=0` with one per-item status of `0x80020003` for every id encoding tried. 660 refuses the handles 659 hands out, 533 refuses every size and flag combination, and 548 and 657 refuse the first argument values tried.
+- The AIO batch entries were written off as lethal on 14.10 because 661 kills. They are not lethal and not absent: the entries validate an id namespace, and every earlier six-zero sweep at 661-670 was refused by the `count` check (contract: 1..128) before it reached one. What an id has to name is still unknown - 661, the only handler that would create one, dies on touch.
+- 660 stays shut for every handle this process can name: the two from 659, `0`, a mapped page, `page+0x28`, and all **38 handles** that 592 hands out - each refused with the `0x160` gate untouched, so the handle is rejected before a record is built. The id space of 662/663/664 is equally shut: 512 encodings (slot 0-255, then handle 0-255) give one status, `0x80020003`. Whatever an id names is created by 661, which kills on touch.
+- **W^X is confirmed by read-back for the first time.** 547 reports the region record for an address, so the page can be inspected before and after a call: `mprotect(page, 0x4000, 7)`, `(…, 5)` and `(…, 4)` each return `-1` and leave the record byte-identical at `prot=0x33` while the page stays writable. The earlier statement was measured by the return value alone.
+
+## 2026-10-21: The corpus now skips the pages that allocate by design
+
+- The rebuilt corpus (1932 pages, the full post-cut commit set rather than the 27% sample) reached index 74 on the console and got "there is not enough free system memory" within a second. That page is `array-from-cloned-arguments-large-length.js`: `//@ memoryHog!` in the header, `arguments.length = 0x10000001` in the body, 268 million elements requested from `Array.from`.
+- Thirteen of the rebuilt pages carry `//@ memoryHog!`, so `tools/webkit_crash_corpus.py` drops them the same way it drops `$memoryLimited`, and the corpus is 1919 pages. `test_memory_hog_case_is_dropped` covers it; the test file is at 10 tests.
+- One more class hangs by design: `exception-can-be-already-thrown-during-exit` is `for(;;)` under `//@ runDefault("--watchdog=5000")`, a test of what the engine does when its own watchdog fires. The builder strips `runDefault`, so the loop never ends and the console showed "this page isn't responding" at index 545. Nine other pages carry a watchdog option; the ones with an unbounded loop are dropped (`JSC_WATCHDOG_LOOP` and `JSC_UNBOUNDED_LOOP`), the bounded ones are kept.
+- Four more cases allocate a gigabyte or more without the marker: three `dataview-byte-length` variants build `new ArrayBuffer(fourGigs)` from `fourGigs = 4 * oneGiga`, and `osr-exit-scratch-buffer-gc` repeats a string `0x40000000` times. Indexes 425, 426, 427 and 949 each produced the same memory message. The builder now resolves the size through the file's `const NAME = <expr>;` definitions and drops allocations at or above 256 MB, so a rebuild carries 1915 pages; 12 tests pass.
+
+## 2026-10-21: A single page exhausts the guide browser's memory, and the corpus pass completes
+
+- The corpus stopped at the same index in every attempt, and the last run loaded that case **alone**, in its own document, from a fresh guide process: `BOOT-510-from-295-to-296`, one GET of `/corpus/jsc-296-proxy-handler-traps-cache-poly-proto-handler.html`, `BEFORE-295`, then "there is not enough free system memory" about a second later. The case ends the WebProcess by itself; the accumulated heap of several hundred documents has nothing to do with it. Session `7smqr0`, log `results/webkit/server_20261021_183352.log`.
+- Six variants and four controls cut it down (sessions `sunejr`, `yh77dd`). All four of these are required: a poly-proto handler object, a cached `get` trap, `setPrototypeOf(handler, null)` after the trap was cached, and a read through the Proxy afterwards. The helper alone, the Proxy alone, an ordinary handler, `null` before the trap was cached, a `{}` prototype instead of `null`, and `null` with no read after it all complete.
+- The missing invalidation is not specific to `get`: the `has` shape, instrumented call by call, answers `true` before the prototype change, survives `setPrototypeOf` itself, and never returns from the `in` lookup after it; the `ownKeys` shape returns `a` from `Object.keys` before and exhausts memory on the call after. Sessions `lcluko`, `bme8v3`. Three of the handler-traps cache paths end the process, not one.
+- **The regexp case is a one-line hang**: `/.*X/u.test("\u{10000}a")` never returns on 14.10. The case's own complexity canary passes (1/2/7/32 ms at n = 250/500/1000/2000), so the O(n^3) fix is present; block 7 of the case ("no match after full backtrack") is where it stops, and the reduction needs the `u` flag, a backtracking quantifier, a non-BMP character with a code unit after it, and no match. Three code units, no proportional work, so it is a loop in the start-offset step, not slow matching. `probes/phase13_webkit/p174-regexp-nonbmp-hang.js` is the reproducer; Finding 8 has the ladder.
+- **The corpus pass completed on 14.10** (2026-10-21 18:25-18:56, sessions `0fiy0d`, `1so3em`, `7sfr7w`, `ikvy87`): 507 of 510 cases completed. The three that did not are case 295 (Proxy trap cache, memory message), case 378 (`regexp-unicode-greedy-charclass-backtrack-linear`, page stops responding, while V8 runs the same body in 372 ms and Chromium completes the page), and case 495, which turned out to be a corpus defect: its `skip if $buildType == "debug" or $memoryLimited` directive was not caught by the filter, so a 179 MB `new Function` source hung the console and a desktop Chromium alike. See Finding 8 and the console results in `docs/WEBKIT_CORPUS.md`.
+- The `$memoryLimited` filter now matches the flag anywhere inside a `skip if` directive; the corpus is 509 pages, and `test_memory_limited_inside_a_compound_directive_is_dropped` pins it.
+- The run state is a locked read-merge-write (furthest cursor, union of skips, highest marker per session) with retried reads: a stale copy had resumed one run on the case it had skipped and restarted another at index 30 from 363. The runner also floors `start` at the highest index the document reached, so a cached case page cannot send it backwards.
+- `probes/phase13_webkit/p173-poly-proto-oom.js` is the reproducer: twelve lines of legal JavaScript that take the browser past its memory budget. This is an engine-level failure and the first positive result the corpus has produced - a denial of service on the WebProcess, not a wrong value, not a corruption and not a sandbox escape. Whether the allocation is unbounded or recursive is not established. `docs/WEBKIT_FINDINGS.md` Finding 7, `docs/WEBKIT_CORPUS.md` console results.
+- The per-case runner was measured properly for the first time: 222 documents from index 288 to 509 with no memory refusal, about a tenth of a second per case (session `xd8deu`).
+- Two harness defects fixed. A second document could walk the corpus in parallel with the first (two chains, one beacon counter, cases from both ends of the list in one log); every hop now carries a generation number and a stale document beacons `STALE-<g>` and stops. And the handoff navigated on regardless of `count`, so `count` bounded nothing; a case page now stops at `e=<end>` with `BATCH-END-<i>`, which is what makes a one-case measurement possible.
+- Three stray `<<<<<<< HEAD` lines from an earlier cherry-pick were removed from this file.
+
+
 ## 2026-10-21: The public netcontrol use-after-free is a leak on 14.10
 
 - Registering a socket with `cmd 0x20000003` takes a **reference** on it, and unregistering returns that reference. The peer of a `socketpair` shows it: no registration and the peer reads `0` (EOF) once the other end closes; with a registration it still reads `-1`, connected; register, unregister, close reads `0` again. `probes/phase17_new_vectors/233a_netcontrol_peer_state.lua`, `234a_netcontrol_ref_release.lua`, captures `results/phase17_new_vectors/233a_netcontrol_peer_state_20261021_144705.txt`, `results/phase17_new_vectors/234a_netcontrol_ref_release_20261021_144722.txt`.
@@ -149,6 +566,69 @@
 - `docs/SYSCALL_ABSENT_VS_LETHAL.md` gains "Not every kill recovers in nine seconds". The 9.31 s self-restart is the loader-only case: `sys 1 exit`, `sys 8 compat.creat` and `sys 9 munmap` each left port 9026 refusing for longer than the sweep's 240 s wait, so the game goes down with the process and nothing is left to bring the loader back. The `9-537` sweep aborted at number 9 for that reason; `--wait-for-loader` remains the fast path, not a guarantee.
 
 
+## 2026-10-21: A netcontrol registration outlives its descriptor
+
+- The public Poops chain's use-after-free is a descriptor closed while it is registered. `probes/phase17_new_vectors/219a_netcontrol_close_registered.lua` does exactly that on 14.10: register fd 28 -> `0`, `close(28)` -> `0`, a new socket takes number 28 again, and the unregister of the closed descriptor returns `-1`. Nothing dies and the descriptor table keeps working. Capture `results/phase17_new_vectors/219a_netcontrol_close_registered_20261021_141946.txt`.
+- The failed unregister leaves the queue in a state no later call can clear. `probes/phase17_new_vectors/221a_netcontrol_stale_registration.lua` then registers and unregisters three freshly opened descriptors 28, 29 and 30, and a fourth at 31: every call returns `-1`. So the block is process-wide rather than per-descriptor, and one orphaned registration makes the subsystem unusable for the rest of the process. Capture `results/phase17_new_vectors/221a_netcontrol_stale_registration_20261021_142008.txt`.
+- `220a` measured nothing: it ran in the same process after 219a, so its `-1` registers are the wedge 219a produced, not an answer about its own trigger. The trigger is re-ordered in `probes/phase17_new_vectors/222a_netcontrol_clean_trigger.lua`, which runs a control register/unregister pair first and skips the trigger unless both returned `0`.
+- The process holding the orphaned entry was then killed with an absent syscall and the loader did not answer within the following 60 s, which is longer than the 24.7 s a repeated kill costs on a busy boot (`results/phase17_new_vectors/restart_pressure_20261021_133337.txt`). Whether that is an ordinary restart and whether the console panicked is not yet distinguished; the decisive run is `222a` on a fresh loader.
+- Scope: nothing here is a memory-corruption primitive. What is established is that the queue keeps state past the lifetime of the descriptor it names - the precondition for the public chain's bug - and that the teardown of that state is what the console reacted to.
+
+## 2026-10-21: netcontrol (99) still accepts the netevent queue commands
+
+- `99 netcontrol` was only ever measured as "present, `-1` on six zeros". It is the syscall the scene's one public kernel chain (Poops) drives, so the ABI mattered more than the return value. `probes/phase17_new_vectors/218a_netcontrol_abi.lua` calls it in the documented shape `__sys_netcontrol(ifindex, cmd, buf, size)` and 14.10 answers: `(-1, 0x20000003, buf{fd}, 8)` -> `0` registers the socket, `(-1, 0x20000007, buf{fd}, 8)` -> `0` unregisters it. Capture `results/phase17_new_vectors/218a_netcontrol_abi_20261021_140851.txt`.
+- The arguments are validated rather than ignored: fd `0xFFFF` and fd `0` return `-1` for both commands, a NULL buffer returns `-1`, and the size must reach 8 - `size` 0 and 4 return `-1` while 8, 16 and 64 return `0`, so the handler reads an int at `buf[0]` and nothing else.
+- The registration is not one-shot: register, unregister and register again on the same open descriptor return `0` each time, and three fresh sockets each register and unregister cleanly. Of the sixteen commands `0x20000000`-`0x2000000F`, only `0x20000003` and `0x20000007` are accepted, so the command space is narrow and known.
+- Scope: the public chain's use-after-free needs the descriptor to be **closed while registered**. This probe never does that - every register is followed by an unregister on the same open fd - so nothing here says whether the free path still exists on 14.10. It says the subsystem is compiled in, reachable from a game process, and argument-checked.
+- On the netcontrol question in general: the public Poops chain (Gezine/egycnq, from TheFlow's `ExploitNetControlImpl`) tops out at 12.00, and Sony has had four firmware lines since, so the queue code has been reworked. A follow-up probe can close a registered descriptor and then unregister it, which is the trigger; that is a kernel-panic risk and not something to run blind.
+
+## 2026-10-21: The event flag handle generation wraps after eight reuses
+
+- `probes/phase17_new_vectors/209a_evf_waiter_across_reuse.lua`: a waiter blocked on a flag with a null timeout; `539 delete` returned `0` and its result page went `DEADBEEF` -> `0`; the freed index was reissued for a new flag straight away, and neither `544 set` nor `543 poll` on the new flag touched the old waiter's page. Capture `results/phase17_new_vectors/209a_evf_waiter_across_reuse_20261021_121811.txt`.
+- The handle word is `generation << 13 | index`. Four create/delete rounds on one slot give `0x206`, `0x2206`, `0x4206`, `0x6206`, and twenty rounds give `207 2207 4207 6207 8207 A207 C207 E207` then `207` again: eight generation values, no wider tag, exact handle reuse every eight reuses. Captures `results/phase17_new_vectors/210a_evf_generation_wrap_20261021_121823.txt`, `211a_evf_generation_sequence_20261021_121831.txt`.
+- Because the reuse is exact, a handle captured eight churns earlier is byte-identical to the live object's handle and drives it: `544(stale, 1)` returned `0` and `543(live, 1, 1)` then returned `0`. The class check still holds, so the stale alias cannot cross object classes - `558` on an evf handle and `539` on a namedobj handle return `-1`, and the object stays usable. Captures `results/phase17_new_vectors/212a_evf_stale_handle_20261021_121844.txt`, `213a_evf_class_blind_20261021_121853.txt`.
+- `538`/`557` accept names up to 31 characters and return `-1` at 32, and `-1` for a NULL name, so the name copy is bounded and length-checked rather than length-trusting. Capture `results/phase17_new_vectors/216a_evf_name_bound_20261021_122014.txt`.
+- The `542` timeout is still unidentified. `{0,0}` and `{0, 120000000}` return within about one scheduler tick with mask `0`; `{0, 500000000}`, `{50000000,0}`, `{150000000,0}` and `{400000000,0}` block; an uptime-derived pair `{2243, 528426302}` returns in 11 ms and `{1792581070, 187000000}` blocks. Neither a relative nanosecond field nor an absolute uptime deadline fits, and the `{1,0}` case wedged the loader. Captures `results/phase17_new_vectors/205a_evf_deadline_clock_20261021_121135.txt`, `206a_evf_timeout_unit_20261021_121433.txt`, `207a_evf_timeout_corners_20261021_121507.txt`.
+- The wedges from 202a, 207a and 208a share one cause: `thr_create` stops returning once roughly fifteen to nineteen threads have been spawned in a process, and parked waiters never exit. A session therefore supports a handful of child threads and then needs a relaunch; the timeout probes were cut short by this rather than by the calls under test.
+
+## 2026-10-21: The event flag family is live, and its wait blocks
+
+- `538 evf_create` is not a stub: given a name pointer and a non-zero bit count it returns a handle (`546`-`552`), and `557 namedobj_create` keeps handing out from the same table. `544 set`, `543 poll`, `542 wait`, `539`/`558` delete all answer. `probes/phase17_new_vectors/192a_stateful_abi.lua`, `193a_handle_lifecycle.lua`, capture `results/phase17_new_vectors/192a_stateful_abi_20261021_115932.txt`.
+- Handles carry an index and a generation (`0x2000 | index` for evf, `0x4000`/`0x6000` for the others; 518, 545 and 8737 are the same index at three generations), and both delete paths check the class: `558` on an evf handle and `539` on a namedobj handle return `-1` and leave the object alive, so the shared table is not a type-confusion route. Capture `results/phase17_new_vectors/197a_handle_class_confusion_20261021_120244.txt`.
+- `543` is `(handle, bits, mode)`: a 3x3 matrix shows only `mode` 1 and 2 succeed and only when the requested bit is set; `mode` 0 fails, a clear bit fails, and polling twice returns `0` both times, so polling does not consume the bit. `542` accepts the same three leading arguments and, with a null fifth argument, **blocks** - a child thread slept until `544` from the main thread set the bit, and the satisfied mask appeared in the fourth argument, a page we own (`DEADBEEF` -> `1`). Captures `results/phase17_new_vectors/195a_evf_mask_mode_20261021_120109.txt`, `200a_evf_wait_blocking_20261021_120516.txt`.
+- `539 delete` on a flag that has a blocked waiter returns `0` and wakes the waiter with mask `0`; the freed index is handed out again immediately with a bumped generation. No fault and no double free are visible from userland, so whether the waiter was dropped from the object before the free is not settled. Capture `results/phase17_new_vectors/201a_evf_delete_under_wait_20261021_120547.txt`.
+- `542`'s fifth argument is a timeout, but a page holding `{tv_sec = 0, tv_nsec = 120000000}` makes the wait return immediately with mask `0`, which is what an absolute deadline in 1970 would do; a null fifth argument blocks. `probes/phase17_new_vectors/202a_evf_wait_layout.lua` and `203a_evf_deadline_timer.lua` carry the elapsed-time test. Capture `results/phase17_new_vectors/202a_evf_wait_layout_20261021_120645.txt` (the run wedged the loader at the fourth layout).
+- Hazard, recorded in `docs/ATTACK_SURFACE.md`: `thr_kill(tid, 0)` only answers whether the thread exists, so a thread asleep in a wait is not reclaimed; each parked waiter spends a thread slot permanently, and after four of them `thr_create` stopped returning and wedged the Lua thread. Delete the object to wake a waiter.
+
+## 2026-10-21: The blockpool handles are file descriptors with no consumer
+
+- `653 blockpool_open` was the one number in the 601-660 block whose answer changed between calls, and the 22/23/24 sequence read either as handles or as `EINVAL`/`ENFILE`/`EMFILE`. `probes/phase17_new_vectors/190a_blockpool_fd_semantics.lua` separates the two by moving the descriptor table: a socket opened first answered `22`, then `653` answered `23`, `24`, `25`, `-1`; `close(23)` returned `0` and the next open answered `22` again. Capture `results/phase17_new_vectors/190a_blockpool_fd_semantics_20261021_113658.txt`.
+- The limit is three concurrent handles per process and closing frees a slot: a restarted loader (pid 87) gave `22, 23, 24` then `-1`, and closing all three gave the same three again. Capture `results/phase17_new_vectors/191a_blockpool_descriptor_20261021_114008.txt`.
+- Nothing consumes the descriptor. `mmap` returns `-1` for `MAP_SHARED`, `0x1002` and two lengths; `read`, `write`, `ioctl` return `-1`; `654 blockpool_map`, `655 blockpool_unmap`, `673 blockpool_move` return `-1` for every layout. `657 blockpool_batch` returns `0` and zeroes the dword at arg3 even after the handle was closed, but the only bytes it writes are zeroes, so nothing can be read back. Recorded in `docs/ATTACK_SURFACE.md`.
+
+## 2026-10-20: The presence map covers 595 slots
+
+- Sweep `104-537`: 328 numbers reached, 238 returned, 89 killed, `432 thr_self` produced no output and stopped the run. Capture `results/phase15_native_sysent/syscall_isolation_sweep_20261020_213026.json`.
+- Six handlers return a positive FreeBSD errno instead of the loader's `-1`: `125` -> 4, `141` -> 22, `310` -> 54, `330` -> 1, `362` -> 22, `429` -> 14. Positive returns are the only unambiguous sign that a handler ran and rejected the arguments, and `docs/SYSCALL_ABSENT_VS_LETHAL.md` gains the four-way reading (positive errno, `0`, `-1`, nothing).
+- `tools/gen_presence_map.py --write` regenerated `docs/SYSENT_PRESENCE_14_10.md` from every sweep record: 595 slots, `kills` where the process died and `present` otherwise.
+
+## 2026-10-20: The ucontext cannot name a kernel code selector
+
+- `probes/phase17_new_vectors/189a_cs_selector_mask.lua` tests the `SEL_RPL_MASK` question directly. The user code selector on 14.10 is `0x43` (index 8, RPL 3); the same index with RPL 0 is `0x40`. With the mask the kernel rewrites `0x40` to `0x43` and the thread parks; without it `0x40` names a DPL-3 descriptor at CPL 0 and the `iretq` panics. Measured: control `CS=0x43` parked with `tid=0x18EDD`, `CS=0x40` returned `rv=0` with `tid=0x18EEF`, and the canary answered `pid=827` after both. Capture `results/phase17_new_vectors/189a_cs_selector_mask_20261020_210825.txt`.
+- So the `thr_create` defect is a panic only: the ucontext cannot raise CPL, and `docs/THR_CREATE_PANIC_PATH_13.60.md` records the test next to the two scenarios it discriminates.
+
+## 2026-10-20: The loader port comes back before the loader does
+
+- `probes/phase17_new_vectors/188a_sys94_repeat.lua` clears the sweep's stop at syscall 94: three rounds of six zeros, fds 1/2/0/3 and `0x1000` in every slot all return `-1`, `getpid` answers `0x334` between each pair, and the script finishes. Capture `results/phase17_new_vectors/188a_sys94_repeat_20261020_210214.txt`.
+- The stop was a loader state, not the syscall: after 93's kill the listener accepted again while the Lua thread never answered, for minutes, until a relaunch. `tools/send_probe.py` gains `loader_answers()`, which sends `print("LOADER-READY")` and waits for the reply, and `wait_for_loader(..., answers=True)` uses it on every poll; `tools/syscall_isolation_sweep.py` and `tools/bounds_fuzz.py` both pass the flag, so a listener without a thread stops the run instead of being swept into. 36 tests pass.
+- `docs/SYSCALL_ABSENT_VS_LETHAL.md` records the state and how to tell it from a park.
+
+## 2026-10-20: A size-fuzz driver for the Sony handlers, and a kill that outlives four minutes
+
+- New `tools/bounds_fuzz.py` varies what the present Sony handlers in 574-660 are *told* about their buffer instead of only reading their return value. The generated probe allocates 0x6000 bytes, canvases them, hands the handler a pointer 0x2000 inside and, after the call, counts dwords changed inside the declared size and outside it. A write outside the size is `OVERFLOW`; a write while the size is zero is `WROTE_AT_ZERO_SIZE`, which is the same finding from the other side. One connection per `(number, layout, size)` triple, layouts move the buffer and the size between argument positions, `--wait-for-loader` resumes after a kill. Sizes above 0x10000 print a warning: a handler that trusts the size can drive the copy into unmapped memory and panic the console, which needs a power cycle rather than a relaunch. `tools/test_bounds_fuzz.py` covers the probe builder, response parsing, the two verdicts and the retry loop; 11 tests, no console needed.
+- `docs/SYSCALL_ABSENT_VS_LETHAL.md` gains "Not every kill recovers in nine seconds". The 9.31 s self-restart is the loader-only case: `sys 1 exit`, `sys 8 compat.creat` and `sys 9 munmap` each left port 9026 refusing for longer than the sweep's 240 s wait, so the game goes down with the process and nothing is left to bring the loader back. The `9-537` sweep aborted at number 9 for that reason; `--wait-for-loader` remains the fast path, not a guarantee.
+
+
 ## 2026-10-20: `thr_create(430)` starts a user thread — threading is alive on 14.10
 
 - New `docs/THREADING_ALIVE_14_10.md`. The kernel accepts a `thr_create(430)` context when it carries the three validator gates from the 13.60 decode (`+0x108 = 0x480`, `+0x0d0 <= 7`, `+0x110 = 0x10000`) and the user-mode selectors at the offsets the register copy actually reads: `CS = 0x43` at `+0x0c0`, `RIP` at `+0x0e0`, `RSP` at `+0x0f8`, `SS = 0x3b` at `+0x100`.
@@ -161,6 +641,13 @@
 - The captured request does not replay off-console: the same path and `/update/ps5/official/<token>/ps5UPDATE.PUP`, over HTTP and HTTPS, all return `404` with a 10-byte body from `AkamaiNetStorage`. The token is necessary but not sufficient, so the check does not produce a downloadable PUP.
 - Even a PUP would not be a kernel image: the update file is encrypted per system software version, `ps5-pup-decrypt` asks the console itself to decrypt it (same version or same `.XX` line only, and it needs code execution on the console), and `ps5-pup-unpacker` only unpacks an already-decrypted PUP.
 - Recorded conclusion: kernel work on 14.10 stays limited to syscall-observable behaviour until a decrypted 13.60/14.xx dump exists; no public one was found on 2026-10-20.
+
+## 2026-10-20: `thr_create(430)` starts a user thread — threading is alive on 14.10
+
+- New `docs/THREADING_ALIVE_14_10.md`. The kernel accepts a `thr_create(430)` context when it carries the three validator gates from the 13.60 decode (`+0x108 = 0x480`, `+0x0d0 <= 7`, `+0x110 = 0x10000`) and the user-mode selectors at the offsets the register copy actually reads: `CS = 0x43` at `+0x0c0`, `RIP` at `+0x0e0`, `RSP` at `+0x0f8`, `SS = 0x3b` at `+0x100`.
+- `probes/phase17_new_vectors/156c_thr_create_correct_offsets.lua` returns `rv = 0`, writes TID `0x18ee3`, and `thr_kill(433, sig=0)` answers `0` for it, while the same call with a rejected context leaves a TID behind that `thr_kill` reports absent (`probes/phase17_new_vectors/156a_thr_create_spin_observable.lua`). `probes/phase17_new_vectors/156d_thr_create_child_executes.lua` goes further: the child executes `mov [rdi], rax; ret` (`48 89 07 c3` at `0x64832c67` in eboot's RX `.text`), stores `0xdeadbeefcafe` through `RDI` into a page we mapped, then spins at `jmp $` (`0x647b5481`). The console did not restart and the loader process kept pid 91 across every run.
+- The 2026-10-19 thread series did not establish what its index rows claimed, so those rows are corrected: `80c` returned `rv = -1` with `marker unchanged — thread did not write`; `80h` returned `rv = 0` but never reads the marker back; `80i`'s four captures all stop at `calling thr_create`, so no DEADBEEF write is recorded. The earlier "CS=0x43 prevents the panic" reading of `80a` was also wrong — that context set none of the three gates, so the handler rejected it at `+0x108` before it read CS. `probes/phase17_new_vectors/156b_ucontext_layout.lua` confirms `thr_get_ucontext(634)` is not an alternative route: both argument shapes return `-1` and leave the buffer untouched.
+- Not established: the single-variable CS control (`CS = 0` with a valid `RIP`, which would reboot the console), thread teardown from userland (`thr_suspend(442)` returns `-1` for the child, so a spinning thread outlives the probe), TLS or libc use inside the child, and any kernel primitive — the child runs in ring 3 with the loader's own privileges.
 
 ## 2026-10-20: Public WebKit crash corpus, and popup requests that kill the guide's WebProcess
 
