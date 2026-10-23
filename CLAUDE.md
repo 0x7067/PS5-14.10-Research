@@ -44,6 +44,8 @@ This section scopes the current claims; older notes describe their cited probe s
 | UMTX_OP functional (op 5/21) | UMTX_OP_WAIT blocks correctly on value match; NWAKE_PRIVATE returns 0; MUTEX_LOCK writes owner TID (probes 56i2, 152k) |
 | Device inventory (34/76 nodes) | 34 of 76 `/dev` nodes open from game process (`gc`, `dce`, `ajm`, `dmem0`-`2`, `camera`, `usb`, `hid`, `bt`, `rng`, `gic`, `notification*`, HMD sets); ioctl reaches drivers, they reject commands. 32-bit dirent layout. Probes 259a-268a, PR #74 ng643, 2026-10-21 |
 | thr_new(455) with arg delivery | `start_func(arg)` where `arg` arrives in `rdi`. `struct thr_param` (0x38 bytes): start_func(+0), arg(+8), stack_base(+0x10), stack_size(+0x18), child_tid(+0x30). Much simpler than thr_create(430) ucontext. Gadget `mov [rdi],rax;ret` at eboot+0x92C67. Probe 56l, 2026-10-23 |
+| Child thread ROP syscalls | thr_new child with controlled stack executes arbitrary single-arg syscalls via ROP: pop_rax_ret(+0x992) → syscall_no → fn_addr → pop_rdi_rbp_ret(+0x169) → arg. close(fd) confirmed. RSP = ((stack_base + stack_size) & ~0xF) - 8. Probe 271g, 2026-10-23 |
+| EVFILT_TIMER + socketpair | kqueue(362) + kevent(363) with EVFILT_TIMER(-7) works at 1ms resolution. AF_UNIX socketpair (SOCK_DGRAM) works: write/kevent pipeline confirmed. Probe 271i, 2026-10-23 |
 
 ### What's Blocked (Hard Walls)
 - **fn_addr/ROP execution is not demonstrated** — 45c undermines that earlier model for tested calls. Later selected CClosure redirects are separate userland evidence; neither identifies the complete syscall dispatcher
@@ -325,7 +327,8 @@ docs/
 - **sendfile error path data leak** — sendfile(393) returns -1 on unconnected TCP socket. sbytes output pointer left completely unmodified (sentinel intact). No partial write, no kernel stack data leak on error. (probe 56q section C, 2026-10-23)
 - **poll output overcopy** — poll(209) on UDP socket with zero timeout. revents=0, zero bytes modified past 8-byte pollfd struct. (probe 56q section D, 2026-10-23)
 - **Signal delivery frame (sendsig) kernel stack residue** — sigframe is 2128 bytes (0x850), 486 modified dwords, all zeros and userland addresses. sendsig() zero-initializes the frame. No kernel pointers in padding. (probe 56r, 2026-10-23)
-- **Eboot syscall instruction scan** — full 4.6MB .text scanned for 0F 05. 18 hits, all in data/immediates, zero followed by C3 (ret). No syscall;ret gadget exists in eboot. Child threads cannot make kernel calls via ROP. TOCTOU race conditions requiring concurrent syscalls are impossible from this sandbox. (probe 56s, 2026-10-23)
+- **Eboot syscall instruction scan** — full 4.6MB .text scanned for 0F 05. 18 hits, all in data/immediates, zero followed by C3 (ret). No `syscall;ret` gadget exists in eboot. However, child threads CAN make kernel calls via ROP using `fn_addr` (the libkernel syscall stub) directly — close(fd) confirmed (probe 271g). The 56s conclusion about "no child syscall capability" is superseded. (probe 56s, 2026-10-23)
+- **Kqueue race condition (ZDI-26-784)** — exhaustive testing with child thread concurrent close via ROP across 4 race variants: empty-socket close (200 races), data-bearing socket close (5000), EV_ONESHOT close (5000), close-kqueue-fd (50), timer+close-kqueue (100), socket+timer combo (100). >10,000 total race attempts, 0 anomalies, 0 kernel pointer leaks. Kernel kqueue locking is solid on PS5 14.10. Child thread closes fd before kevent accesses it — knote detached cleanly. (probes 271g/271h/271i, 2026-10-23)
 
 ## Sending Probes
 
@@ -393,7 +396,8 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - sendfile error path — sbytes untouched on failure (56q)
 - poll — no overcopy past pollfd (56q)
 - Signal delivery frame (sendsig) — frame zero-initialized, no kptrs (56r)
-- Eboot syscall scan — 18 hits, zero syscall;ret, no child syscall capability (56s)
+- Eboot syscall scan — 18 hits, zero syscall;ret in eboot, but fn_addr ROP works (56s, superseded by 271g)
+- Kqueue race (ZDI-26-784) — 10,000+ races across 4 variants, 0 anomalies, kernel locking solid (271g/271h/271i)
 
 **NEXT STEPS:**
 1. **★ ioctl brute-force on remaining 32 devices** — The Praetorian KASLR leak is an unidentified Sony ioctl over-copy. `/dev/gc` and `/dev/dce` are clean (56m). The other 32 open nodes lack known command tables. Need group-scan approach: for each device, sweep ioctl codes `0xC0xx_GG00`–`0xC0xx_GGFF` for group IDs 0x00-0xFF, checking which return 0 instead of -1, then scan those output buffers for kernel pointers. This is the last viable KASLR vector that doesn't require a kernel image.
@@ -410,6 +414,9 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - kevent + SCM_RIGHTS + sendfile + poll scan all clean/blocked (56q)
 - Signal frame (sendsig) scan clean (56r) — 2128B frame, all userland
 - Full eboot syscall scan: 18 hits, zero syscall;ret confirmed (56s)
+- **Child thread ROP syscalls confirmed (271g)** — close(fd) via ROP chain on child stack. Gadgets: pop_rax_ret at eboot+0x992, pop_rdi_rbp_ret at +0x169
+- EVFILT_TIMER + socketpair pipeline verified (271i) — kqueue works with timers and AF_UNIX
+- Kqueue race exhausted (271g/271h/271i) — 10,000+ races, 0 anomalies, ZDI-26-784 dead on 14.10
 
 ## When Analyzing Results
 
