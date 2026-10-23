@@ -401,10 +401,11 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - Signal delivery frame (sendsig) — frame zero-initialized, no kptrs (56r)
 - Eboot syscall scan — 18 hits, zero syscall;ret in eboot, but fn_addr ROP works (56s, superseded by 271g)
 - Kqueue race (ZDI-26-784) — 10,000+ races across 4 variants, 0 anomalies, kernel locking solid (271g/271h/271i)
+- **Ioctl overcopy full sweep — ALL 34 /dev nodes clean** (387a/387c): 48,446 calls (256 groups × 5 sizes × 2 dirs) across 19 non-catch-all, non-gc/dce devices. Only hit: `/dev/usbctl` group 0x51 (cmds 0x00/0x01, USB descriptor "HID_IGNORE"), all within declared bounds. Combined with gc/dce (56m), ugen0.2 (387a), catch-all devices (387a): zero overcopy, zero kernel pointers on any accessible device. The Praetorian KASLR ioctl is not reachable from the game process.
 
 **NEXT STEPS:**
-1. **★ ioctl brute-force on remaining 32 devices** — The Praetorian KASLR leak is an unidentified Sony ioctl over-copy. `/dev/gc` and `/dev/dce` are clean (56m). The other 32 open nodes lack known command tables. Need group-scan approach: for each device, sweep ioctl codes `0xC0xx_GG00`–`0xC0xx_GGFF` for group IDs 0x00-0xFF, checking which return 0 instead of -1, then scan those output buffers for kernel pointers. This is the last viable KASLR vector that doesn't require a kernel image.
-2. **★ Kernel image acquisition** — without a 14.10 kernel dump, we can't identify the Praetorian ioctl device/command, verify sysent layout, or find new attack surface. Investigate if any accessible syscall or device node can copy kernel .text (e.g. debug stubs, coredump paths, unknown 13.60 syscalls that might work differently on 14.10).
+1. **★ Kernel image acquisition** — without a 14.10 kernel dump, we can't identify the Praetorian ioctl device/command (may require credentials the game lacks), verify sysent layout, or find new attack surface. Investigate if any accessible syscall or device node can copy kernel .text (e.g. debug stubs, coredump paths, unknown 13.60 syscalls that might work differently on 14.10).
+2. **★ BSD-native syscall range (1-530)** — the Sony range (532-676) is largely exhausted: almost all 145 handlers have been called with 13.60 contract args on 14.10. Only 604/636 (no decoded contract) and 658 (fdatasync, no buffer) remain. The BSD-native range has ~400 syscalls with no decompiled contracts — Sony-specific modifications or bugs may exist there.
 3. **JSC corpus** — requires browser access mechanism from game process (not currently available)
 
 **DONE (this session):**
@@ -420,6 +421,10 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - **Child thread ROP syscalls confirmed (271g)** — close(fd) via ROP chain on child stack. Gadgets: pop_rax_ret at eboot+0x992, pop_rdi_rbp_ret at +0x169
 - EVFILT_TIMER + socketpair pipeline verified (271i) — kqueue works with timers and AF_UNIX
 - Kqueue race exhausted (271g/271h/271i) — 10,000+ races, 0 anomalies, ZDI-26-784 dead on 14.10
+- Child thread fake TCB fix (384b) — sysarch(SET_FSBASE=129) with self-referencing 4KB buffer
+- Child multi-arg confirmed (384b/386a) — getpid(0-arg), write(3-arg), socketpair(4-arg) from child. No r8/r9 gadgets in 4.6MB eboot — max 4 controlled args
+- Concurrent child races clean (385a) — double-close, UMTX trylock, socket write+close: 0 anomalies
+- **Ioctl overcopy full sweep COMPLETE (387a/387c)** — all 34 /dev nodes clean. usbctl group 0x51 only hit (USB descriptor, no overcopy). Praetorian KASLR ioctl not accessible from game process
 
 ## When Analyzing Results
 
