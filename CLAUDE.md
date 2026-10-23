@@ -309,6 +309,9 @@ docs/
 - **sys 624 side channel** — madvise distinguishes user/kernel (delta=1 vs 0) but ALL kernel addresses give identical delta. No intra-kernel discrimination. mincore/547/674/msync: delta=0 always. (probe 56f, 2026-10-23)
 - **Sysctl deep scan** — zero kernel pointers across ALL accessible CTL_* subtrees (kern/vm/net/hw/machdep/debug/proc). Only hw.model (48B) and kinfo_proc (1096B) return data. kern.proc.auxv not available. (probe 56g3, 2026-10-23)
 - **Timing KASLR via mprotect** — batch timing (2000 calls × 5 rounds) showed peaks that move between runs — scheduling noise, not signal. mprotect on kernel addrs returns 0 immediately (early return, no page table walk). No clean `rdtsc; ret` gadget in eboot. clock_gettime overhead (~90μs) drowns sub-microsecond signals. (probes 56h-56i2, 2026-10-23)
+- **ioctl over-copy scan (/dev/gc, /dev/dce)** — all 23 data-returning `/dev/gc` group 0x81 commands and `/dev/dce` command `0x80088209` tested with 4KB sentinel-filled buffers. Zero bytes modified past declared length. Zero kernel pointers anywhere. The Praetorian ioctl is not in these two devices. (probe 56m, 2026-10-23)
+- **Thread ucontext kernel pointer scan** — sys 634 copies 0x4c0 bytes of a suspended child's registers. All 304 dwords scanned. Only userland addresses: eboot pointers, heap, stack. `0xFFFFFFFF` at `+0xA0` is the `-1` sentinel. Zero real kernel pointers. Confirms register layout (RDI=arg at +0x48, RIP at +0xE0). (probe 56n, 2026-10-23)
+- **getsockopt kernel pointer scan** — SOL_SOCKET (SO_TYPE/ERROR/SNDBUF/RCVBUF/LINGER/PEERLABEL/LISTENQ*), IPPROTO_TCP (NODELAY/MAXSEG/INFO/CONGESTION/CCALGOOPT/KEEP*/FUNCTION_BLK), LOCAL_PEERCRED. Only SO_LINGER(8B), TCP_INFO(236B), TCP_CONGESTION(8B) returned data. Zero kernel pointers, zero over-copy. (probe 56n, 2026-10-23)
 
 ## Sending Probes
 
@@ -365,10 +368,16 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - mprotect ret=0 on kernel/unmapped addresses — early-return without VM map check; 547 confirms no protection change. W^X only rejects EXEC on mapped pages. No KASLR oracle, no write primitive. (56k)
 
 **NEXT STEPS:**
-1. **★ ioctl output buffer kernel pointer scan** — Praetorian's KASLR leak is an **unidentified ioctl over-copy**, not the routing socket data path. The specific ioctl is withheld/unpatched upstream. Our ioctl sweep (273a-287a) tested for exploitable commands, not info leaks in output buffers. `/dev/gc` group 0x81 returns data — worth re-scanning those 25 commands for kernel pointers in output.
-2. **★ thr_new(455) confirmed** — DONE: arg in rdi, `mov [rdi],rax;ret` at eboot+0x92C67 writes rax=455 to marker. Simpler than thr_create(430).
-3. **★ 243a thread slot reclaim** — DONE: 10 completed waiters + 17 new parkers = 27 total. Slots reclaim after waiter completion.
+1. **★ ioctl over-copy on remaining 32 devices** — `/dev/gc` and `/dev/dce` are clean (56m). Praetorian's leak is an unidentified Sony ioctl. The other 32 open nodes lack known command tables — need either brute-force group scan or a 14.10 kernel image to extract driver ioctl tables.
+2. **★ recvmsg SCM_CREDS / unix socket credential leak** — untested vector. `LOCAL_CREDS` socket option causes kernel to attach credential data to received messages; padding might contain uninitialized kernel stack data.
+3. **★ signal delivery frame scan** — when kernel delivers a signal, it pushes context onto user stack. If the frame contains more data than sys 634 exposes, padding might leak kernel pointers.
 4. **JSC corpus** — requires browser access mechanism from game process (not currently available)
+
+**DONE (this session):**
+- thr_new(455) arg delivery confirmed (56l) — rdi=arg, gadget at eboot+0x92C67
+- ioctl over-copy scan /dev/gc + /dev/dce clean (56m)
+- ucontext + getsockopt kptr scan clean (56n)
+- Thread slot reclaim confirmed (243a) — 27 total spawns
 
 ## When Analyzing Results
 
