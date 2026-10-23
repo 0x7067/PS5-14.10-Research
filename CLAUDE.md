@@ -305,6 +305,9 @@ docs/
 - **NET_RT_DUMP kernel pointer search** — 4968 bytes, 17 routing messages. 5 values matched kernel pointer pattern (`0xFFFF8xxx+`) at non-aligned offsets. Full hexdump (56e2) proved ALL are false positives: sockaddr boundary crossings where netmask `FF FF FF` bytes combine with adjacent sockaddr `sa_len`/`sa_family` fields. Padding after sockaddr_in6 is `0xFF` (not zeroed) but contains no real kernel addresses. RTM_GET is deterministic (10 calls, zero varying bytes). (probes 56e/56e2, 2026-10-23)
 - **CVE-2026-3038 sa_len=127 routing socket overflow** — sa_len=127 write accepted (279 bytes), kernel returned normal 272-byte response without panic. Either Sony patched the `rtsock_msg_buffer()` validation (build Sep 2026, fix Feb 2026) or the overflow doesn't reach the stack canary for this code path. (probe 56e section F, 2026-10-23)
 - **CClosure deep Lua stack read** — rax=0,1,6,7,8 gadgets found in eboot (no rax=2,3,4,5 in 1.5MB scan). rax=N redirected rawequal reads N values from Lua stack: args, function objects, caller local variables. rax=8 with 0 args reads caller's `nret` and `args_str` locals. ALL values are userland heap objects (0x310xxxxxxx) or eboot pointers (0x532xxxxxxx). Zero kernel pointers in the Lua stack. (probes 56d5-56d7, 2026-10-23)
+- **sys 624 side channel** — madvise distinguishes user/kernel (delta=1 vs 0) but ALL kernel addresses give identical delta. No intra-kernel discrimination. mincore/547/674/msync: delta=0 always. (probe 56f, 2026-10-23)
+- **Sysctl deep scan** — zero kernel pointers across ALL accessible CTL_* subtrees (kern/vm/net/hw/machdep/debug/proc). Only hw.model (48B) and kinfo_proc (1096B) return data. kern.proc.auxv not available. (probe 56g3, 2026-10-23)
+- **Timing KASLR via mprotect** — batch timing (2000 calls × 5 rounds) showed peaks that move between runs — scheduling noise, not signal. mprotect on kernel addrs returns 0 immediately (early return, no page table walk). No clean `rdtsc; ret` gadget in eboot. clock_gettime overhead (~90μs) drowns sub-microsecond signals. (probes 56h-56i2, 2026-10-23)
 
 ## Sending Probes
 
@@ -354,12 +357,15 @@ Results are saved to `results/<phase>/<name>_<timestamp>.txt`.
 - NET_RT_DUMP kernel pointer search — all false positives, sockaddr boundary artifacts (56e/56e2)
 - CVE-2026-3038 sa_len=127 routing overflow — accepted without panic, likely patched (56e)
 - CClosure deep Lua stack read — only userland pointers, zero kernel addresses (56d5-56d7)
+- sys 624 side channel — no intra-kernel discrimination, all kernel addrs identical (56f)
+- Sysctl deep scan — zero kernel pointers in ALL CTL_* trees (56g3)
+- Timing KASLR (mprotect batch + stability) — scheduling noise only (56h-56i2)
 
 **NEXT STEPS:**
-1. **★ Run JSC corpus (p172)** — 518 regression test cases targeting WebKit bugs fixed after Safari 17.0 branch. Guide browser engine is pre-17.0. Even one crash is a lead. (PR #75 ng643)
-2. **Syscall timing side channels via sys 624** — 624 counts VM ops (+5 per mmap). If a kernel operation's VM op count varies based on address-space layout, it leaks KASLR bits. Need to find a syscall whose VM op count depends on kernel state.
-3. **native.fcall_with_rax for KASLR** — we can call arbitrary userland functions. If libkernel exports a function that leaks kernel info (e.g., through error paths, timing), this is the way to reach it. Systematic scan of libkernel/libc exported symbols needed.
-4. **Remaining gaps** — syscalls 530–532/537 (PR #72 gap), probe 243a (thread slot reclaim, written not run)
+1. **★ Untested syscalls 530–532/537** — PR #72 gap. Never probed. Could have unexpected behavior or info leak.
+2. **★ mprotect ret=0 on kernel addresses** — 56f showed mprotect returns SUCCESS (ret=0) for kernel addresses with delta=1. Anomalous — FreeBSD should reject. Does it actually change kernel page permissions? Needs verification with sys 547 before/after.
+3. **JSC corpus** — requires browser access mechanism from game process (not currently available)
+4. **probe 243a** — thread slot reclaim, written not run
 
 ## When Analyzing Results
 
